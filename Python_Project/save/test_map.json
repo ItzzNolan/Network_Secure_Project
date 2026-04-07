@@ -1,0 +1,122 @@
+{
+    "width": 5,
+    "height": 5,
+    "grid": [
+        [
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            }
+        ],
+        [
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            }
+        ],
+        [
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            }
+        ],
+        [
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            }
+        ],
+        [
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            },
+            {
+                "terrain": "grass",
+                "walkable": true
+            }
+        ]
+    ],
+    "units": [],
+    "ai_state": {
+        "current_orders": [],
+        "target": null,
+        "mode": "idle"
+    }
+}

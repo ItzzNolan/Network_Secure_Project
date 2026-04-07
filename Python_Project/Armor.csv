@@ -1,0 +1,4 @@
+Unit	Base_Melee	Base_Pierce	Mounted_Units	Spear_Units	Infantry	All_Archers
+Knight	2	2	0	None	None	None
+Pikeman	0	0	None	0	0	None
+Crossbowman	0	0	None	None	None	0
