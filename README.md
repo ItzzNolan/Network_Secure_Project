@@ -1,6 +1,24 @@
 # Network_Secure_Project
 Continuation of the Python project with integration into networks and systems
 
+Le projet "MedievAIl BAIttle GenerAIl" est un simulateur de batailles médiévales en 2.5D développé en Python.
+
+L'objectif ...
+
+Ce projet est réalisé par une équipe de 8 étudiants -INSA CVL
+
+## Équipe
+
+- Fatiha
+- Nolan
+- Léo
+- Imen
+- Ines
+- Clélie
+- Romain
+- Hippolyte
+
+
 Technologies Utilisées
 
 - **Langage :** Python 3.x
