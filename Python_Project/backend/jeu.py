@@ -216,3 +216,56 @@ class Jeu:
 
     def deplacer_vers(self, unite, cible_x, cible_y):
         self._executer_move(unite, (cible_x, cible_y))
+        
+    def appliquer_message(self, message: Dict):
+        type = message.get("type").lower()
+        player_id = int(message.get("player_id"))
+        if type == "join":
+            player_name = message.get("player_name", "Unknown")
+            units = message.get("units", [])
+            ia = message.get("ia")
+            self.generaux[player_id] = make_general(ia, id_player=player_id)
+            print(f"[JEU] Player {player_name} (ID: {player_id}) joined")
+            for unit_info in units:
+                entity_id = unit_info.get("entity_id")
+                unit_type = unit_info.get("unit_type")
+                x = unit_info.get("x")
+                y = unit_info.get("y")
+                self.ajouter_unite(nom_unite=unit_type, x=x, y=y, equipe=player_id)
+            """Et envoyer un full state (On se coordonne avec J1 pour savoir comment on s'en occupe)"""
+        elif type == "update":
+            action = message.get("action")
+            if action=="move":
+                entity_id = message.get("entity_id")
+                target_x = message.get("x")
+                target_y = message.get("y")
+                unit = self.get_unit_by_id(entity_id)
+                if unit and unit.alive:
+                    self._executer_move(unit, (target_x, target_y))
+            elif action=="attack":
+                attacker_id = message.get("attacker_id")
+                target_id = message.get("target_id")
+                attacker = self.get_unit_by_id(attacker_id)
+                target = self.get_unit_by_id(target_id)
+                if attacker and target and attacker.alive and target.alive:
+                    self._executer_attack(attacker, target)
+            elif action=="die":
+                entity_id = message.get("entity_id")
+                unit = self.get_unit_by_id(entity_id)
+                if unit:
+                    unit.HP = 0
+                    unit.alive = False
+                self.unites[entity_id]=None
+                self.carte.retirer_unite(unit)
+        elif type == "disconnect":
+            if player_id in self.generaux:
+                del self.generaux[player_id]
+                print(f"[JEU] Player ID {player_id} left")
+                for unit in self.unites:
+                    if unit and unit.equipe == player_id:
+                        unit.HP = 0
+                        unit.alive = False
+                        self.carte.retirer_unite(unit)
+                self.unites = [u for u in self.unites if u and u.alive]
+        else:
+            print(f"[JEU] Unknown message type: {type}")
