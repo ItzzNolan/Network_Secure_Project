@@ -4,6 +4,9 @@
 
 
 #define MAX_PEERS 100
+#define SERVER "127.0.0.1"
+#define BUFLEN 52
+#define PORT 1234
 
 typedef struct{
     struct sockaddr_in addr;
@@ -64,5 +67,47 @@ int peer_find(struct sockaddr_in addr){
 }
 
 int main(int argc, char *argv[]){
+
+    int sockfd1 = socket(AF_INET, SOCK_DGRAM,0);
+    int sockfd2 = socket(AF_INET, SOCK_DGRAM,0);
+    int sockfd3 = socket(AF_INET, SOCK_DGRAM,0);
+
+    int  port = PORT;
+
+    struct sockaddr_in sock1;
+    sock1.sin_addr.s_addr = inet_addr(SERVER);
+    sock1.sin_family = AF_INET;
+    sock1.sin_port = htons(port);
+
+
+    struct sockaddr_in sock2;
+    sock2.sin_addr.s_addr = inet_addr(SERVER);
+    sock2.sin_family = AF_INET;
+    sock2.sin_port = htons(port);
+
+    struct sockaddr_in sock3;
+    sock3.sin_addr.s_addr = inet_addr(SERVER);
+    sock3.sin_family = AF_INET;
+    sock3.sin_port = htons(port);
+
+    peer_add(sock1,10);
+    peer_add(sock2,20);
+    peer_add(sock3,30);
+
+    peer_get_all();
+
+    peer_remove(20);
+
+    int sockfd4 = socket(AF_INET, SOCK_DGRAM,0);
+    struct sockaddr_in sock4;
+    sock4.sin_addr.s_addr = inet_addr(SERVER);
+    sock4.sin_family = AF_INET;
+    sock4.sin_port = htons(port);
+
+    peer_add(sock4,40);
+
+    peer_get_all();
+
+    peer_find(sock3); //pb même  adresse IP et même port, prend la première
 
 }

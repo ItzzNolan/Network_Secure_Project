@@ -33,7 +33,7 @@ int main(int argc, char *argv[]){
    struct sockaddr_in clia_addr;
 
    struct sockaddr_in serv_addr; 
-   int len, nbbytes, slen;
+   int len, nbbytes;
    
 
    if(sockfd == -1){
@@ -61,6 +61,7 @@ int main(int argc, char *argv[]){
                (socklen_t*)&len))<0){
          stop("error recvfrom");
        }
+      message[nbbytes] '\0';
       printf("%s",message);
     
       sleep(1);
