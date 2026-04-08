@@ -1,2 +1,4 @@
 __pycache__/
 ipc_c
+.DS_Store
+.gitignore
