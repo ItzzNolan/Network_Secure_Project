@@ -222,6 +222,7 @@ def cmd_run(args):
         clock.tick(60)
     
     pygame.quit()
+    partie.disconnect() # fermer proprement la connexion IPC en envoyant un message de disconnect
   
     if args.d and gagnant:
         data = {
