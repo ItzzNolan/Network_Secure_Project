@@ -27,7 +27,7 @@ int main(int argc, char *argv[]){
 
    int sockfd = socket(AF_INET, SOCK_DGRAM,0);
 
-   char message[BUFLEN+1] = "PONG";
+   char message[BUFLEN+1];
  
 
    struct sockaddr_in clia_addr;
@@ -52,7 +52,7 @@ int main(int argc, char *argv[]){
       stop("Error connecting");
    }
 
-   if( bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr))<0){
+   if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr))<0){
       stop("Error on biding");
    }
 
@@ -66,14 +66,10 @@ int main(int argc, char *argv[]){
          stop("error recvfrom");
        }
       printf("%s",message);
-      printf("ip : %s,et port : %d \n", inet_ntoa(clia_addr.sin_addr),ntohs(clia_addr.sin_port));
-
+    
       sleep(1);
 
-      slen = sizeof(serv_addr);
-      if(sendto(sockfd, message,strlen(message),0,(struct sockaddr *) &serv_addr,slen) == -1){
-         stop("error sendto");
-      }
+      
       close(sockfd);
    }while(1);
 }
