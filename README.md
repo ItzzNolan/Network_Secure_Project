@@ -38,5 +38,5 @@ git clone https://github.com/ItzzNolan/Network_Secure_Project
 ```
 ...Ou pour toute version alternative juste du main :
 ```bash
-git clone --branch projet_python_main --single-branch --depth 1 https://github.com/ItzzNolan/Network_Secure_Project.git
+git clone --branch project_py_main --single-branch --depth 1 https://github.com/ItzzNolan/Network_Secure_Project.git
 ```
