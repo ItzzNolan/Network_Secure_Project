@@ -1,0 +1,79 @@
+//A enlever :  le message "j'ai bien reçu" pour écouter seulement
+
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/socket.h>
+#include <errno.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <string.h>
+#include <unistd.h>
+
+
+#define SERVER "127.0.0.1"
+#define BUFLEN 52
+#define PORT 1234
+
+
+
+void stop(char *s){
+   perror(s);   
+   exit(EXIT_FAILURE);
+}
+
+int main(int argc, char *argv[]){
+
+
+   int sockfd = socket(AF_INET, SOCK_DGRAM,0);
+
+   char message[BUFLEN+1] = "PONG";
+ 
+
+   struct sockaddr_in clia_addr;
+
+   struct sockaddr_in serv_addr; 
+   int len, nbbytes, slen;
+   
+
+   if(sockfd == -1){
+      stop("error socket");
+   }
+
+   serv_addr.sin_addr.s_addr = inet_addr(SERVER);
+
+   serv_addr.sin_family = AF_INET;
+ 
+   int  port = PORT;
+   serv_addr.sin_port = htons(port);
+
+
+   if(connect(sockfd, ( struct sockaddr *) &serv_addr,sizeof(serv_addr)<0)){
+      stop("Error connecting");
+   }
+
+   if( bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr))<0){
+      stop("Error on biding");
+   }
+
+   bzero(&message,BUFLEN+1);
+   len = sizeof(clia_addr);
+
+   do{
+ 
+      if  ((nbbytes = recvfrom(sockfd,message, BUFLEN,0, (struct sockaddr *) &clia_addr,
+               (socklen_t*)&len))<0){
+         stop("error recvfrom");
+       }
+      printf("%s",message);
+      printf("ip : %s,et port : %d \n", inet_ntoa(clia_addr.sin_addr),ntohs(clia_addr.sin_port));
+
+      sleep(1);
+
+      slen = sizeof(serv_addr);
+      if(sendto(sockfd, message,strlen(message),0,(struct sockaddr *) &serv_addr,slen) == -1){
+         stop("error sendto");
+      }
+      close(sockfd);
+   }while(1);
+}
