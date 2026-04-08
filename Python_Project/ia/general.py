@@ -679,11 +679,6 @@ class TestGameView:
                 grid[x][y] = str(unit.owner)
 
         return ["".join(row) for row in grid]
-        
-
-# ----------------------------
-#      Simulateur - Tests
-# ----------------------------
 
 #Variable globale geree par le simulateur pour le cooldown
 CURRENT_TICK = 0
@@ -757,6 +752,81 @@ class SharedScene:
     
     def advance_tick(self):
         self._tick += 1
+
+# ----------------------------
+#      Simulateur - Tests
+# ----------------------------
+
+class Simulator:
+    """Orchestre le placement alterne et le combat
+    1. Chaque IA place ses units une par une, en alternance par round
+    2. Des que les deux camps sont presents --> le combat s'enclenche en parallele du placement (les units restantes arrivent encore)
+    3. Les incoherences de placement sont signalees et appliquees (remplacement brutal)
+    4. Le combat s'arrete quand une equipe entiere est eliminee."""
+
+    def __init__(self, map:SharedScene, generals:Dict[int, General], unit_queues:Dict[int, List[TestUnit]], placement_delay:float = 0.4, combat_tick_delay:float = 0.25):
+        self.map = map
+        self.generals = generals
+        #Copie des files de placement par joueur
+        self.queues = {pid:list(units) for pid, units in unit_queues.items()}
+        self.placement_delay = placement_delay
+        self.combat_tick_delay = combat_tick_delay
+        self.combat_started = False
+        self.winner:Optional[int] = None
+
+    #Placement des units
+    def _place_phase(self):
+        """Place les units une par une en alternant entre les joueurs
+        Des que les deux camps ont au moins une unit vivante, le combat est declenche
+        Le placement continue jusqu'a epuisement de toutes les files
+        """
+        Logs.log("\n" + "═" * 50)
+        Logs.log("PHASE DE PLACEMENT - concurrence sauvage")
+        Logs.log("═" * 50)
+
+        player_ids = list(self.queues.keys())
+        round_num = 0
+
+        while any(self.queues[pid] for pid in player_ids):
+            for pid in player_ids:
+                if not self.queues[pid]:
+                    continue
+
+                unit = self.queues[pid].pop(0)
+                general = self.generals[pid]
+
+                Logs.log(f"\n[Round {round_num}] {general.name} (P{pid}) place U{unit.id} ({unit.unit_class}) en {unit.pos}")
+
+                collision = self.map.place_unit(unit)
+
+                if collision:
+                    Logs.log("Ressource precedente ecrasee !")
+
+                self._show_map()
+                time.sleep(self.placement_delay)
+
+                #Declencher le combat si possible
+                if self.map.has_both_sides() and not self.combat_started:
+                    Logs.log("\n>>>Les deux camps sont en présence, le combat commence !")
+                    self.combat_started = True
+
+                #Si le combat a commence, execute un tick de bataille
+                if self.combat_started:
+                    tick_simulation()
+                    if self.winner is not None:
+                        return #victoire pendant le placement
+            round_num += 1
+
+        Logs.log("\n>>>Toutes les units ont ete placees")
+    
+    #Affichage
+    def _show_map(self):
+        game = self.map.game
+        Logs.log("\n--- MAP (tick {}) ---".format(self.scene._tick))
+        for row in game.map_ascii():
+            Logs.log(row)
+        Logs.log("")
+
 
 def check_victory(gameView:TestGameView) -> Optional[int]:
     #Verifier les equipes
