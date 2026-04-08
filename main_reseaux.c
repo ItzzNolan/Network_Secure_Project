@@ -39,6 +39,8 @@ int main(int argc, char *argv[]){
    if(sockfd == -1){
       stop("error socket");
    }
+   int opt = 1;
+   setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
    serv_addr.sin_addr.s_addr = inet_addr(SERVER);
 
@@ -61,7 +63,7 @@ int main(int argc, char *argv[]){
                (socklen_t*)&len))<0){
          stop("error recvfrom");
        }
-      message[nbbytes] '\0';
+      message[nbbytes] = '\0';
       printf("%s",message);
     
       sleep(1);
