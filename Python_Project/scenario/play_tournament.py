@@ -19,35 +19,43 @@ def initialiser(generaux: list, list_unite: dict, swap_positions=False, map_size
     else:
         partie = Jeu(generaux[0], generaux[1], largeur=map_size, hauteur=map_size)
 
-    partie.envoyer_join() # envoyer le message JOIN après l'initialisation du jeu
-    
     liste = []
     for k, v in list_unite.items():
         for i in range(v):
             liste.append(k)
     random.shuffle(liste)
-    
+
     h = partie.carte.hauteur
-    mid = h // 2
-    x = 0
-    taille = len(liste)
-    cpt = 0
-    
-    while taille > h:
-        taille //= 2
-        x += 1
-    
+    w = partie.carte.largeur
+    mid = w // 2
+
     equipe_gauche = 1 if swap_positions else 0
     equipe_droite = 0 if swap_positions else 1
-    
-    for i in range(x + 1):
-        for j in range(mid - taille // 2, mid - taille // 2 + taille):
-            partie.ajouter_unite(f"{liste[cpt]}", i, j, equipe_gauche)
-            partie.ajouter_unite(f"{liste[cpt]}", partie.carte.largeur - i - 1, j, equipe_droite)
-            cpt += 1
-    
-    return partie
 
+    occupied:set = set()
+
+    def pick_random_pos(x_min: int, x_max: int) -> tuple:
+        """Tire une case libre au hasard dans la zone [x_min, x_max] x [0, h-1]."""
+        t=0
+        while t<10_000:
+            x = random.randint(x_min, x_max)
+            y = random.randint(0, h-1)
+            if (x, y) not in occupied:
+                return (x, y)
+            t += 1
+
+    for type_unite in liste:
+        #Equipe gauche
+        pos_g = pick_random_pos(0, mid-1)
+        occupied.add(pos_g)
+        partie.ajouter_unite(type_unite, pos_g[0], pos_g[1], equipe_gauche)
+
+        #Equipe droite (symetrique en x)
+        pos_d = pick_random_pos(mid, w-1)
+        occupied.add(pos_d)
+        partie.ajouter_unite(type_unite, pos_d[0], pos_d[1], equipe_droite)
+
+    return partie
 
 def tournoi(generaux: list, list_unite: dict, nb_combat=100, not_alternate=False, map_size=30, scenario_name="sc1", tournament=None):
     """
