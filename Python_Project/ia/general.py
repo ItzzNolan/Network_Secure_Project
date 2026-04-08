@@ -786,6 +786,7 @@ class Simulator:
 
         player_ids = list(self.queues.keys())
         round_num = 0
+        place_num = 0
 
         while any(self.queues[pid] for pid in player_ids):
             for pid in player_ids:
@@ -795,7 +796,10 @@ class Simulator:
                 unit = self.queues[pid].pop(0)
                 general = self.generals[pid]
 
-                Logs.log(f"\n[Round {round_num}] {general.name} (P{pid}) place U{unit.id} ({unit.unit_class}) en {unit.pos}")
+                Logs.log(f"\nPlacement {place_num}")
+                place_num += 1
+                Logs.log("═" * 50)
+                Logs.log(f"[Round {round_num}] {general.name} (P{pid}) place U{unit.id} ({unit.unit_class}) en {unit.pos}")
 
                 collision = self.map.place_unit(unit)
 
@@ -822,10 +826,33 @@ class Simulator:
     #Affichage
     def _show_map(self):
         game = self.map.game
-        Logs.log("\n--- MAP (tick {}) ---".format(self.scene._tick))
+        Logs.log("\n--- MAP (tick {}) ---".format(self.map._tick))
         for row in game.map_ascii():
             Logs.log(row)
         Logs.log("")
+    
+    def _show_state(self):
+        Logs.log(f"\n--- Tick {self.map._tick} ---")
+        for u in sorted(self.map.units, key=lambda x: (x.owner, x.id)):
+            status = f"HP={u.hp:2d}" if u.is_alive else "MORT"
+            Logs.log(f"Unit{u.id:02d}(Player{u.owner}) {u.unit_class:8} "
+                     f"pos={u.pos}  {status}")
+    
+    def _check_victory(self):
+        Logs.log("\n" + "═" * 50)
+        
+        if self.winner==-1:
+            Logs.log("MATCH NUL - toutes les units sont eliminees !")
+        else:
+            win_name = self.generals[self.winner].name
+            Logs.log(f"VICTOIRE de {win_name} (Player {self.winner}) "
+                     f"au tick {self.map._tick} !")
+        Logs.log("═" * 50)
+
+        if self.map.conflicts:
+            Logs.log(f"\n{len(self.map.conflicts)} incoherence(s) detectee(s) :")
+            for c in self.map.conflicts:
+                Logs.log("  " + c)
 
     #Combat
     def _tick_simulation(self):
@@ -957,42 +984,33 @@ class Simulator:
         win = self.map.check_winner()
         if win is not None:
             self.winner = win
-
-def check_victory(gameView:TestGameView) -> Optional[int]:
-    #Verifier les equipes
-    alive_player_0 = [unit for unit in gameView.units if unit.owner==0 and unit.is_alive]
-    alive_player_1 = [unit for unit in gameView.units if unit.owner==1 and unit.is_alive]
     
-    if not alive_player_0:
-        print("\nVICTOIRE DE L'EQUIPE 1")
-        return 1
-    if not alive_player_1:
-        print("\nVICTOIRE DE L'EQUIPE 2")
-        return 2
-    return None
 
+    def _combat_phase(self):
+        """Boucle de combat pure (apres fin du placement)"""
+        Logs.log("\n" + "═" * 50)
+        Logs.log("PHASE DE COMBAT - toutes les units sont en jeu")
+        Logs.log("═" * 50)
 
-
-    print("\n---ETAT APRES TICK---")
-    Logs.log("\n---ETAT APRES TICK---")
-    for unit in sorted(id_to_unit.values(), key=lambda x:(x.owner, x.id)):
-        print(f"Unit{unit.id:02d} (Player{unit.owner}) pos={unit.pos} hp={unit.hp}")
-        Logs.log(f"Unit{unit.id:02d} (Player{unit.owner}) pos={unit.pos} hp={unit.hp}")
-
-def print_state(gameView:TestGameView) -> None:
-    """Affiche l'etat des unites pour le debugging et les tests"""
-    def unit_line(unit:TestUnit) -> str:
-        return f"U{unit.id:02d} (P{unit.owner}) {unit.unit_class:8} pos={unit.pos} hp={unit.hp:2d}"
+        while self.winner is None:
+            self._tick_simulation()
+            self._show_state()
+            time.sleep(self.combat_tick_delay)
     
-    print(f"---- Tick {gameView.tick} ----")
-    Logs.log(f"---- Tick {gameView.tick} ----")
+    def run(self):
+        Logs.log("Simulation started.\n")
 
-    for unit in sorted(gameView.units, key = lambda x:(x.owner, x.id)):
-        print(unit_line(unit))
-        Logs.log(unit_line(unit))
-    
-    print("")
-    Logs.log("")
+        #Placement avec combats entrelaces
+        self._place_phase()
+
+        #Combat si personne n'a gagne
+        if self.winner is None:
+            self._combat_phase()
+
+        #Resultat final
+        self._show_map()
+        self._show_state()
+        self._check_victory()
 
 
 if __name__ == "__main__":
@@ -1004,14 +1022,16 @@ if __name__ == "__main__":
     """
 
     #Equipe 1 - 3 soldats && Equipe 2 - 3 soldats ennemis
-    units = [
+    units_p0 = [
         TestUnit(1, 0, (0,0), hp=10, attack_range=1, attack_damage=3, attack_cd_ticks=2, unit_class="Melee"),
         TestUnit(2, 0, (0,1), hp=10, attack_range=1, attack_damage=3, attack_cd_ticks=2, unit_class="Melee"),
         TestUnit(3, 0, (1,0), hp=8, attack_range=2, attack_damage=2, attack_cd_ticks=3, unit_class="Archer"),
         TestUnit(4, 0, (0,0), hp=10, attack_range=1, attack_damage=3, attack_cd_ticks=2, unit_class="Melee"),
         TestUnit(5, 0, (0,1), hp=10, attack_range=1, attack_damage=3, attack_cd_ticks=2, unit_class="Melee"),
         TestUnit(6, 0, (1,0), hp=8, attack_range=2, attack_damage=2, attack_cd_ticks=3, unit_class="Archer"),
-    
+    ]
+
+    units_p1 = [
         TestUnit(11, 1, (8,8), hp=10, attack_range=1, attack_damage=3, attack_cd_ticks=2, unit_class="Melee"),
         TestUnit(12, 1, (8,7), hp=8, attack_range=2, attack_damage=2, attack_cd_ticks=3, unit_class="Archer"),
         TestUnit(13, 1, (7,8), hp=6, attack_range=1, attack_damage=4, attack_cd_ticks=3, unit_class="Pikeman"),
@@ -1020,25 +1040,29 @@ if __name__ == "__main__":
         TestUnit(16, 1, (7,8), hp=6, attack_range=1, attack_damage=4, attack_cd_ticks=3, unit_class="Pikeman")
     ]
 
-    #On initialise le gameView
-    gv = TestGameView(tick=0, units=units)
+    #On initialise la map
+    map = SharedScene(width=12, height=12)
 
     """On cree les generaux"""
     #MajorDAFT pour l'equipe 1 avec un point de regroupement proche
-    #g1 = MajorDAFT(id_player=0, regroup_at=(2,2))
-    g1 = CaptainBraindead(id_player=0)
-    #cdpg1 = ColonelTURTLE(id_player=0)
+    #g0 = MajorDAFT(id_player=0, regroup_at=(2,2))
+    g0 = CaptainBraindead(id_player=0)
+    #g0 = ColonelTURTLE(id_player=0)
 
     #CaptainBraindead pour l'equipe 2 pour voir la difference
-    #g2 = ColonelTURTLE(id_player=1)
-    g2 = MajorDAFT(id_player=1, regroup_at=(5,4))
-    #g2 = CaptainBraindead(id_player=1)
+    #g1 = ColonelTURTLE(id_player=1)
+    g1 = MajorDAFT(id_player=1, regroup_at=(5,4))
+    #g1 = CaptainBraindead(id_player=1)
 
-    generals = {0:g1, 1:g2}
+    generals = {0:g0, 1:g1}
 
-    """Maintenant on simule N ticks et on affiche l'etat des unites"""
+    """Maintenant on simule N ticks et on affiche l'etat des unites
     TICKS = 250
 
     for _ in range(TICKS):
         print_state(gv)
-        tick_simulation(gv, generals)
+        tick_simulation(gv, generals)"""
+    
+    sim = Simulator(map=map, generals=generals, unit_queues={0:units_p0, 1:units_p1}, placement_delay=0.4, combat_tick_delay=0.15)
+
+    sim.run()
