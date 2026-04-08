@@ -33,31 +33,32 @@ int peer_add(struct sockaddr_in addr, int player_id){
 }
 
 
-int peer_remove(int_player_id){
+int peer_remove(int player_id){
      for (int i = 0; i < peer_count; i++) {
         if (peers[i].player_id == player_id) {
             peers[i] = peers[peer_count - 1]; //remplace par le dernier pour pas avoir de trou
             peer_count--;
-            return EXIT_SUCCES;
+            return EXIT_SUCCESS;
         }
     }
+    return EXIT_FAILURE;
 }
 
 void peer_get_all(){
     for (int i = 0; i < peer_count; i++){
-        print(peers[i].addr);
-        print(peers[i].player_id);
+        printf("%d \n", peers[i].player_id);
     }
 }
 
 int peer_find(struct sockaddr_in addr){
     for (int i = 0; i < peer_count; i++){
-        if(peer[i].addr = addr){
-            print(peer[i].pkayer_id);
+        if(peers[i].addr.sin_addr.s_addr == addr.sin_addr.s_addr &&
+            peers[i].addr.sin_port == addr.sin_port){
+            printf("%d \n", peers[i].player_id);
             return EXIT_SUCCESS;
         }
     }
-    print("player not found");
+    printf("player not found");
     return EXIT_FAILURE;
 
 }

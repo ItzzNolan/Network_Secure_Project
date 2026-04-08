@@ -48,10 +48,6 @@ int main(int argc, char *argv[]){
    serv_addr.sin_port = htons(port);
 
 
-   if(connect(sockfd, ( struct sockaddr *) &serv_addr,sizeof(serv_addr)<0)){
-      stop("Error connecting");
-   }
-
    if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr))<0){
       stop("Error on biding");
    }
@@ -68,8 +64,8 @@ int main(int argc, char *argv[]){
       printf("%s",message);
     
       sleep(1);
-
       
-      close(sockfd);
    }while(1);
+   close(sockfd);   
+
 }
