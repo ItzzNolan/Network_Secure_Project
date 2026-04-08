@@ -15,11 +15,7 @@ class Jeu:
             0: make_general(general_bleu, id_player=0),
             1: make_general(general_rouge, id_player=1)
         }
-
-        # 🔥 NOUVEAU
-        self.network = network   # None si local, sinon connexion réseau
-        #FIN NOUVEAU
-        
+       
         print(f"[JEU] General Bleu: {self.generaux[0].name}")
         print(f"[JEU] General Rouge: {self.generaux[1].name}")
         print(f"[JEU] Carte: {largeur}x{hauteur}")
@@ -163,18 +159,8 @@ class Jeu:
                 self._executer_move(unit, action.target_pos)
 
     def mettre_a_jour(self):
-    
-        # 🔥 NOUVEAU : recevoir actions réseau
-        if self.network:
-            actions = self.network.receive()
-
-            if actions:
-                for action in actions:
-                    self.appliquer_action(action)
-        #FIN NOUVEAU
-
-
         self._tour += 1
+
         for unit in self.unites:
             if hasattr(unit, 'timer'):
                 unit.timer += 1
@@ -209,12 +195,6 @@ class Jeu:
         
         self.unites = [u for u in self.unites if u.alive]
 
-        # 🔥 NOUVEAU : envoyer état du jeu
-        if self.network:
-            state = self.export_state()
-            self.network.send(state)
-        #FIN NOUVEAU
-
     def check_victory(self) -> Optional[int]:
         alive_0 = [u for u in self.unites if u.alive and u.equipe == 0]
         alive_1 = [u for u in self.unites if u.alive and u.equipe == 1]
@@ -236,32 +216,3 @@ class Jeu:
 
     def deplacer_vers(self, unite, cible_x, cible_y):
         self._executer_move(unite, (cible_x, cible_y))
-
-    # 🔥 NOUVELLES FONCTIONS
-    def appliquer_action(self, action):
-        """
-        Applique une action reçue du réseau
-        """
-        if action["type"] == "move":
-            unite = self.unites[action["unit_id"]]
-            self.deplacer_unite(unite, action["x"], action["y"])
-
-        elif action["type"] == "attack":
-            unite = self.unites[action["unit_id"]]
-            cible = self.unites[action["target_id"]]
-            unite.target = cible
-            unite.inflict_damage()
-
-    def export_state(self):
-        return [
-            {
-                "id": i,
-                "type": u.Unit,
-                "x": u.coords[0],
-                "y": u.coords[1],
-                "hp": u.HP,
-                "alive": u.alive,
-                "team": u.equipe
-            }
-            for i, u in enumerate(self.unites)
-        ]
