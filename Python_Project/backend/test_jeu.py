@@ -1,16 +1,13 @@
-class FakeNetwork:
-    def __init__(self):
-        self.actions = [
-            {"type": "move", "unit_id": 0, "x": 5, "y": 5},
-            {"type": "move", "unit_id": 1, "x": 6, "y": 5},
-        ]
+# test_jeu.py
+import socket
 
-    def receive(self):
-        if self.actions:
-            return [self.actions.pop(0)]
-        return []
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind(("localhost", 9999))
 
-    def send(self, data):
-        print("ETAT ENVOYÉ :", data)
+print("Listening on 9999...")
+
+while True:
+    data, addr = sock.recvfrom(65535)
+    print("RECU:", data.decode())
 
     

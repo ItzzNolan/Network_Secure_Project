@@ -4,7 +4,7 @@ from typing import List, Optional, Dict
 from backend.carte import Carte
 from backend.Units import Unit
 from ia.general import General, Action, TypeAction, make_general
-from network.ipc_client import IPCClient   # ajout d'un client IPC pour la communication avec l'interface graphique
+from ipc.ipc_python import IPCClient   # ajout d'un client IPC pour la communication avec l'interface graphique
 
 class Jeu:
     def __init__(self, general_bleu: str = "braindead", general_rouge: str = "braindead", 
