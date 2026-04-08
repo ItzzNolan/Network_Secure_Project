@@ -18,6 +18,8 @@ def initialiser(generaux: list, list_unite: dict, swap_positions=False, map_size
         partie = Jeu(generaux[0], generaux[0], largeur=map_size, hauteur=map_size)
     else:
         partie = Jeu(generaux[0], generaux[1], largeur=map_size, hauteur=map_size)
+
+    partie.envoyer_join() # envoyer le message JOIN après l'initialisation du jeu
     
     liste = []
     for k, v in list_unite.items():
