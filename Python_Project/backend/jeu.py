@@ -91,6 +91,15 @@ class Jeu:
         return None
 
     def _executer_move(self, unit: Unit, target_pos):
+        print({
+            "type": "UPDATE",
+            "action": "MOVE",
+            "entity_id": unit.id,
+            "x": unit.coords[0],
+            "y": unit.coords[1],
+            "player_id": unit.equipe
+        })
+
         if unit.coords is None or target_pos is None:
             return
         
@@ -115,7 +124,17 @@ class Jeu:
             ratio = vitesse / distance
             unit.coords = (ux + dx * ratio, uy + dy * ratio)
 
+
     def _executer_attack(self, attacker: Unit, target: Unit):
+        print({
+            "type": "UPDATE",
+            "action": "ATTACK",
+            "attacker_id": attacker.id,
+            "target_id": target.id,
+            "damage": attacker.Attack if hasattr(attacker, "Attack") else 0,
+            "player_id": attacker.equipe
+        })
+
         if not attacker.alive or not target.alive:
             return
         if attacker.coords is None or target.coords is None:
@@ -135,6 +154,12 @@ class Jeu:
             if target.HP <= 0:
                 target.HP = 0
                 target.alive = False
+                print({
+                    "type": "UPDATE",
+                    "action": "DIE",
+                    "entity_id": target.id,
+                    "player_id": attacker.equipe
+                })
 
     def _executer_action(self, action: Action):
         unit = self.get_unit_by_id(action.unit_id)
