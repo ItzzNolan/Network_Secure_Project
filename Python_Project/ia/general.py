@@ -812,7 +812,7 @@ class Simulator:
 
                 #Si le combat a commence, execute un tick de bataille
                 if self.combat_started:
-                    tick_simulation()
+                    self._tick_simulation()
                     if self.winner is not None:
                         return #victoire pendant le placement
             round_num += 1
@@ -827,6 +827,136 @@ class Simulator:
             Logs.log(row)
         Logs.log("")
 
+    #Combat
+    def _tick_simulation(self):
+        """Execute un tick de simulation qui appele chaque general pour obtenir des ordres,
+        qui applique les MOVEs (pas d'1 tile vers la target), qui applique les ATTACKs si la cible
+        est a la portee et si le cooldown est ok, met a jour last_attack_tick et hp
+        puis affiche un resume du tick avec des logs complets :
+        - actions donnees par chaque general
+        - mouvements effectues
+        - attaques + degats infliges
+        - etat final des units
+        """
+        global CURRENT_TICK
+        gameView = self.map.game
+        #Synchronise la var globale typiquement
+        CURRENT_TICK = gameView.tick
+
+        """Creation d'un dictionnaire <<id_to_unit>> où chaque cle est l'identifiant (id) 
+        d'une unite et la valeur est l'objet TestUnit correspondant
+        On accede rapidement a une unite donnee par son identifiant
+        """
+        id_to_unit = {unit.id: unit for unit in self.map.units}
+
+        """Recuperer les ordres de chaque general pour les unites qu'il controle"""
+        all_orders:Dict[int, Action] = {}
+
+        for id_player, general in self.generals.items():
+            #On selectionne les unites vivantes appartenant a ce joueur pour prepare un interface de jeu adapte au General
+            units_for_player = [unit for unit in self.map.units if unit.owner == id_player and unit.is_alive]
+            orders = general.decider_actions(units_for_player, gameView)
+
+        for act in orders:
+            all_orders[act.unit_id] = act
+
+        #Preparer l'occupation pour eviter les collisions
+        occupied_now = {unit.pos for unit in self.map.units if unit.is_alive}
+        reserved_next = set()
+
+        Logs.log("\n---MOUVEMENTS---")
+        """Maintenant, on applique les mouvements (MOVE)"""
+        for uid, mov in all_orders.items():
+            if mov.type != TypeAction.MOVE:
+                continue
+            unit = id_to_unit.get(uid)
+            if not unit or not unit.is_alive or mov.target_pos is None:
+                continue
+
+            before = unit.pos
+
+            ux, uy = unit.pos
+            tx, ty = mov.target_pos
+            dx, dy = tx - ux, ty - uy
+
+            if abs(dx)>=abs(dy) and dx!=0:
+                next_pos = (ux + (1 if dx>0 else -1), uy)
+            elif dy!=0:
+                next_pos = (ux, uy + (1 if dy>0 else -1))
+            else:
+                next_pos = unit.pos
+
+            if (not gameView.is_walkable(next_pos)
+                    or next_pos in reserved_next):
+                cands = [(ux+1,uy),(ux-1,uy),(ux,uy+1),(ux,uy-1)]
+                cands = [c for c in cands if gameView.is_walkable(c)]
+                cands.sort(key=lambda c:gameView.distance_tiles(c, mov.target_pos))
+                found = False
+                for c in cands:
+                    if c not in reserved_next:
+                        next_pos = c
+                        found = True
+                        break
+                if not found:
+                    next_pos = unit.pos
+
+            reserved_next.add(next_pos)
+            unit.pos = next_pos
+            after = unit.pos
+
+            Logs.log(f"\n-> Unit{uid} se deplace de {before} à {after}")
+        
+        Logs.log("\n---ATTAQUES---")
+        """Desormais, on applique les ordres d'attaques (ATTACK)"""
+
+        for uid, att in all_orders.items():
+            if att.type != TypeAction.ATTACK:
+                continue
+            attacker = id_to_unit.get(uid)
+            target = id_to_unit.get(att.target_id)
+            if not attacker or not target:
+                continue
+            if not attacker.is_alive or not target.is_alive:
+                continue
+            if attacker.owner == target.owner:
+                continue
+
+            dist = gameView.distance_tiles(attacker.pos, target.pos)
+            if dist <= attacker.range and attacker.can_attack():
+                before = target.hp
+                target.hp = max(0, target.hp - attacker.attack_damage)
+                attacker.last_attack_tick = CURRENT_TICK
+                Logs.log(f"  U{uid} attaque U{target.id} "
+                         f"-{attacker.attack_damage} PV "
+                         f"({before} → {target.hp})"
+                         + ("[ELIMINE]" if target.hp == 0 else ""))
+            else:
+                Logs.log(f"\n-> Unit{uid} voulait attaquer Unit{att.target_id} mais n'est pas en portee")
+        
+        """Auto attaque (si aucuns ordres est donne)"""
+        for unit in self.map.units:
+            if not unit.is_alive or unit.id in all_orders:
+                continue
+
+            enemies_near = [e for e in self.map.units if e.is_alive and e.owner != unit.owner and gameView.distance_tiles(unit.pos, e.pos)<=unit.range]
+
+            if enemies_near and unit.can_attack():
+                target = min(enemies_near, key = lambda e:e.hp)
+                before = target.hp
+                target.hp -= unit.attack_damage
+                unit.last_attack_tick = CURRENT_TICK
+                if target.hp <= 0:
+                    target.hp = 0
+                Logs.log(f"-> (AUTO) Unit{unit.id} attaque Unit{target.id}")
+                Logs.log(f"(HP {before} -> {target.hp})")
+                Logs.log("[ELIMINE]" if target.hp == 0 else "")
+
+        self.map.advance_tick()
+
+        #Verification de victoires
+        win = self.map.check_winner()
+        if win is not None:
+            self.winner = win
 
 def check_victory(gameView:TestGameView) -> Optional[int]:
     #Verifier les equipes
@@ -842,183 +972,6 @@ def check_victory(gameView:TestGameView) -> Optional[int]:
     return None
 
 
-def show_map(game:TestGameView):
-    print("\n---MAP---")
-    Logs.log("\n---MAP---")
-    for row in game.map_ascii():
-        print(row)
-        Logs.log(row)
-    print("")
-    Logs.log("")
-
-def tick_simulation(gameView:TestGameView, generals):
-    """Execute un tick de simulation qui appele chaque general pour obtenir des ordres,
-    qui applique les MOVEs (pas d'1 tile vers la target), qui applique les ATTACKs si la cible
-    est a la portee et si le cooldown est ok, met a jour last_attack_tick et hp
-    puis affiche un resume du tick avec des logs complets :
-    -actions donnees par chaque general
-    -mouvements effectues
-    -attaques + degats infliges
-    -etat final des units
-    """
-    global CURRENT_TICK
-    #Synchronise la var globale typiquement
-    CURRENT_TICK = gameView.tick
-
-    show_map(gameView)
-
-    """Creation d'un dictionnaire <<id_to_unit>> où chaque cle est l'identifiant (id) 
-    d'une unite et la valeur est l'objet TestUnit correspondant
-    On accede rapidement a une unite donnee par son identifiant
-    """
-    id_to_unit = {unit.id:unit for unit in gameView.units}
-
-    """Recuperer les ordres de chaque general pour les unites qu'il controle"""
-    all_orders:Dict[int, Action] = {}
-    for id_player, general in generals.items():
-        #On selectionne les unites vivantes appartenant a ce joueur pour prepare un interface de jeu adapte au General
-        units_for_player = [unit for unit in gameView.units if unit.owner == id_player and unit.is_alive]
-        orders = general.decider_actions(units_for_player, gameView)
-
-        print(f"\n---Ordres donnes par {general.name} (Player {id_player})---")
-        Logs.log(f"\n---Ordres donnes par {general.name} (Player {id_player})---")
-        if not orders:
-            print("Aucuns ordres donnes")
-            Logs.log("Aucuns ordres donnes")
-        for act in orders:
-            all_orders[act.unit_id] = act
-            print(f"\n---Unit{act.unit_id} -> {act.type.name}" + (f" vers {act.target_pos}" if act.target_pos else "") + (f" cible Unit{act.target_id}" if act.target_id else ""))
-            Logs.log(f"\n---Unit{act.unit_id} -> {act.type.name}" + (f" vers {act.target_pos}" if act.target_pos else "") + (f" cible Unit{act.target_id}" if act.target_id else ""))
-    
-    """On trie les ordres de mouvements (MOVE) et les ordres d'attaques (ATTACK)"""
-    move_orders = {uid: act for uid, act in all_orders.items() if act.type == TypeAction.MOVE}
-    attack_orders = {uid: act for uid, act in all_orders.items() if act.type == TypeAction.ATTACK}
-
-    #Preparer l'occupation pour eviter les collisions
-    occupied_now = {unit.pos for unit in gameView.units if unit.is_alive}
-    reserved_next = set()
-
-    print("\n---MOUVEMENTS---")
-    Logs.log("\n---MOUVEMENTS---")
-
-    """Maintenant, on applique les mouvements (MOVE)"""
-    for uid, mov in move_orders.items():
-        unit = id_to_unit.get(uid)
-        if not unit or not unit.is_alive:
-            continue
-
-        before = unit.pos #pos avant deplacement
-
-        #On cible la position
-        dest = mov.target_pos
-        #Test pas obligatoire mais conseille :)
-        if dest is None:
-            continue
-
-        #Coordonnes actuelles de l'unite et de la destination cible
-        ux, uy = unit.pos
-        tx, ty = dest
-        #Calcul des differences de position
-        dx = tx - ux
-        dy = ty - uy
-        #Choix de l'axe pour le deplacement
-        if abs(dx) >= abs(dy) and dx!=0:
-            move_to = (ux+(1 if dx > 0 else -1), uy)
-        elif dy!=0:
-            move_to = (ux, uy+(1 if dy > 0 else -1))
-        else:
-            move_to = unit.pos #Toujours la
-        
-        #Verifier si l'unite peut se deplacer 
-        if not gameView.is_walkable(move_to) or (move_to in reserved_next and move_to!=unit.pos):
-            candidats = [ (ux+1, uy), (ux-1, uy), (ux, uy+1), (ux, uy-1) ]
-            candidats = [c for c in candidats if 0<=c[0]<gameView.width and 0<=c[1]<gameView.height]
-            candidats.sort(key = lambda c:gameView.distance_tiles(c, dest))
-            found = False
-            for c in candidats:
-                if gameView.is_walkable(c) and (c not in reserved_next):
-                    move_to = c
-                    found = True
-                    break
-            if not found:
-                move_to = unit.pos #On reste s'il bloque        
-
-        reserved_next.add(move_to)
-        unit.pos = move_to
-        after = unit.pos #pos apres deplacement
-        print(f"\n-> Unit{uid} se déplace de {before} à {after}")
-        Logs.log(f"\n-> Unit{uid} se déplace de {before} à {after}")
-    
-    
-    print("\n---ATTAQUES---")
-    Logs.log("\n---ATTAQUES---")
-    """Desormais, on applique les ordres d'attaques (ATTACK)"""
-    for uid, att in attack_orders.items():
-        attacker = id_to_unit.get(uid)
-        #Trouver la cible par id
-        target = id_to_unit.get(att.target_id) #if att.target_id is not None else None
-
-        if not attacker or not target:
-            continue
-
-        if not attacker.is_alive or not target.is_alive:
-            continue
-
-        if attacker.owner == target.owner:
-            """Ordre d'attaquer un allie - Ignore"""
-            continue
-        
-        #On verifie la portee
-        dist  = gameView.distance_tiles(attacker.pos, target.pos)
-        if dist <= attacker.range and attacker.can_attack():
-            before_hp = target.hp
-            #On inflige les dmgs
-            target.hp -= attacker.attack_damage
-            attacker.last_attack_tick = CURRENT_TICK
-            #Limite hp à 0
-            if target.hp <= 0:
-                target.hp = 0
-            
-            print(f"\n-> Unit{uid} attaque Unit{target.id} ")
-            print(f"pour {attacker.attack_damage} dégats ")
-            print(f"(HP {before_hp} -> {target.hp})")
-            Logs.log(f"\n-> Unit{uid} attaque Unit{target.id} ")
-            Logs.log(f"pour {attacker.attack_damage} dégats ")
-            Logs.log(f"(HP {before_hp} -> {target.hp})")
-        else:
-            print(f"\n-> Unit{uid} voulait attaquer Unit{att.target_id} mais n'est pas en portee")
-            Logs.log(f"\n-> Unit{uid} voulait attaquer Unit{att.target_id} mais n'est pas en portee")
-        
-    """Auto attaque (si aucuns ordres est donne)"""
-    for unit in gameView.units:
-        if not unit.is_alive:
-            continue
-        if unit.id in attack_orders:
-            continue
-
-        enemies = [e for e in gameView.units if (e.is_alive and e.owner!=unit.owner) and gameView.distance_tiles(unit.pos, e.pos) <= unit.range]
-
-        if enemies and unit.can_attack():
-            target = min(enemies, key = lambda e:e.hp)
-            before = target.hp
-            target.hp -= unit.attack_damage
-            unit.last_attack_tick = CURRENT_TICK
-            if target.hp <= 0:
-                target.hp = 0
-            print(f"-> (AUTO) Unit{unit.id} attaque Unit{target.id} ")
-            print(f"(HP {before} -> {target.hp})")
-            Logs.log(f"-> (AUTO) Unit{unit.id} attaque Unit{target.id}")
-            Logs.log(f"(HP {before} -> {target.hp})")
-
-    winner = check_victory(gameView)
-    if winner:
-        print(f"\nL'equipe {winner} a gagne")
-        Logs.log(f"\nL'equipe {winner} a gagne")
-        return
-
-    
-    #On incremente le tick global (dans l'objet gameView)
-    gameView.tick += 1
 
     print("\n---ETAT APRES TICK---")
     Logs.log("\n---ETAT APRES TICK---")
