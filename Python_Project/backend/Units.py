@@ -34,6 +34,7 @@ class Unit():
         self.target = None
         self.alive = True
         self.timer=0
+        self.version=1
 
     def def_stat(self, stat, nomUnite):
         """
