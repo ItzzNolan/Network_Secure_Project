@@ -21,18 +21,28 @@ void stop(char *s){
 }
 
 int main(int argc, char *argv[]){
+
    int sockfd,len;
    char message[BUFLEN+1];
+
    if ((sockfd=socket(AF_INET,SOCK_DGRAM,0))<0){
       stop("socket creation failed");
    }
-   struct sockaddr_in serv_addr;
+
+    int broadcast = 1;
+    if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) < 0) {
+        perror("setsockopt SO_BROADCAST");
+        return 1;
+    }
+    struct sockaddr_in serv_addr;
+
    int portno=1234;
    len=sizeof(serv_addr);
    bzero(&serv_addr, sizeof(serv_addr));
    serv_addr.sin_family = AF_INET;
    serv_addr.sin_port=htons(portno);
    inet_aton("127.0.0.1", &serv_addr.sin_addr);
+
    if (sendto(sockfd, MESSAGE, strlen(MESSAGE), 0, (struct sockaddr*)&serv_addr,len)<0){
       stop("sendto");
    }
