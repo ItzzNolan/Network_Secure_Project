@@ -27,23 +27,20 @@ int main(int argc, char *argv[]){
       stop("socket creation failed");
    }
 
-/*
    int broadcast = 1;
    if (setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) < 0) {
-      perror("setsockopt SO_BROADCAST");
-      return 1;
+      stop("setsockopt SO_BROADCAST");
    }
-*/
 
    struct sockaddr_in serv_addr;
-   int portno=1234;
+   int portno=12345;
    len=sizeof(serv_addr);
 
    bzero(&serv_addr, sizeof(serv_addr));
    
    serv_addr.sin_family = AF_INET;
    serv_addr.sin_port=htons(portno);
-   inet_aton("127.0.0.1", &serv_addr.sin_addr);
+   inet_aton("255.255.255.255", &serv_addr.sin_addr);
 
    if (sendto(sockfd, MESSAGE, strlen(MESSAGE), 0, (struct sockaddr*)&serv_addr,len)<0){
       stop("sendto");
