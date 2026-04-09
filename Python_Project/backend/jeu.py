@@ -85,10 +85,7 @@ class Jeu:
             self.carte.placer_unite(nouvelle_unite, x, y)
 
     def get_unit_by_id(self, unit_id: int) -> Optional[Unit]:
-        for u in self.unites:
-            if u.id == unit_id:
-                return u
-        return None
+        return self.unites[unit_id] if 0 <= unit_id < len(self.unites) else None
 
     def _executer_move(self, unit: Unit, target_pos):
         if unit.coords is None or target_pos is None:
@@ -192,8 +189,6 @@ class Jeu:
             self._executer_action(action)
         for action in attack_actions:
             self._executer_action(action)
-        
-        self.unites = [u for u in self.unites if u.alive]
 
     def check_victory(self) -> Optional[int]:
         alive_0 = [u for u in self.unites if u.alive and u.equipe == 0]
@@ -232,7 +227,23 @@ class Jeu:
                 x = unit_info.get("x")
                 y = unit_info.get("y")
                 self.ajouter_unite(nom_unite=unit_type, x=x, y=y, equipe=player_id)
-            """Et envoyer un full state (On se coordonne avec J1 pour savoir comment on s'en occupe)"""
+            entities = [{"entity_id": u.id,"owner_id": u.equipe, "unit_type": u.unit_type, "x": u.coords[0], "y": u.coords[1],"hp": u.HP, "version": u.version} for u in self.unites if u.alive]
+            self.ipc.envoyer({"type": "FULL_STATE", "player_id": 0, "entities": entities})
+        elif type == "full_state":
+            entities = message.get("entities", [])
+            for entity in entities:
+                owner_id = entity.get("owner_id")
+                unit_type = entity.get("unit_type")
+                x = entity.get("x")
+                y = entity.get("y")
+                hp = entity.get("hp")
+                version = entity.get("version")
+                unit = self.get_unit_by_id(entity_id)
+                if unit:
+                    unit.coords = (x, y)
+                    unit.HP = hp
+                    unit.version = version
+                    self.carte.placer_unite(unit, int(x), int(y))
         elif type == "update":
             action = message.get("action")
             if action=="move":
@@ -266,6 +277,6 @@ class Jeu:
                         unit.HP = 0
                         unit.alive = False
                         self.carte.retirer_unite(unit)
-                self.unites = [u for u in self.unites if u and u.alive]
+                        self.unites[unit.id]=None
         else:
             print(f"[JEU] Unknown message type: {type}")
