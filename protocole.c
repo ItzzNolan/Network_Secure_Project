@@ -138,4 +138,5 @@ char* message_receive() {
 }
 
 int main(int argc, char *argv[]){
+    char message = message_receive();
 }
