@@ -232,8 +232,8 @@ class Jeu:
         elif type == "full_state":
             entities = message.get("entities", [])
             for entity in entities:
-                owner_id = entity.get("owner_id")
                 unit_type = entity.get("unit_type")
+                equipe=entity.get("owner_id")
                 x = entity.get("x")
                 y = entity.get("y")
                 hp = entity.get("hp")
@@ -243,6 +243,7 @@ class Jeu:
                     unit.coords = (x, y)
                     unit.HP = hp
                     unit.version = version
+                    unit.equipe = equipe
                     self.carte.placer_unite(unit, int(x), int(y))
         elif type == "update":
             action = message.get("action")
