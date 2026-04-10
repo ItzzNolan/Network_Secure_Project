@@ -10,8 +10,7 @@
 
 
 #define PORT 12345
-#define BUFLEN 2000
-
+#define BUFLEN 2000 // a changer quand on connaitra la taille max
 
 void stop(char *s){
    perror(s);
@@ -41,10 +40,10 @@ int udp_recv(){
    char message[BUFLEN+1];
 
    struct sockaddr_in cli_addr;
-   socklen_t addrlen = sizeof(cli_addr);
 
    do{
       bzero(&message, BUFLEN+1);
+      socklen_t addrlen = sizeof(cli_addr);
       int nbbytes = recvfrom(sockfd,message,BUFLEN, 0,(struct sockaddr*)&cli_addr,&addrlen);
 
       if (nbbytes < 0) {
