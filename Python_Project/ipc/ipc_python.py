@@ -30,6 +30,17 @@ class IPCClient:
                 break
         return messages
 
-        
+    def attendre_reponse_prop(self, entity_id, timeout=3):
+        debut = time.time()
+        while time.time() - debut < timeout:
+            try:
+                data, addr = self.sock.recvfrom(65535)
+                msg = json.loads(data.decode("utf-8"))
+                if msg.get("type") in ("GRANT_PROP", "DENY_PROP") and msg.get("entity_id") == entity_id:
+                    return msg
+                self.file_attente.append(msg)
+            except BlockingIOError:
+                time.sleep(0.01)
+        return None   
     def fermer(self):
         self.sock.close()
