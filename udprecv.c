@@ -18,37 +18,35 @@ void stop(char *s){
 }
 
 int udp_recv(const void* data, size_t max_len){
+   int sockfd =socket(AF_INET, SOCK_DGRAM,0); 
+   if(sockfd < -1){
+      stop("error socket");
+        
+   }
+   int opt = 1;
+   setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-    if(sockfd == -1){
-        socket(AF_INET, SOCK_DGRAM,0); //pour ne pas recréer la socket a chaque fois
-        if(sockfd <0){
-            stop("error socket");
-        }
-    }
-    int opt = 1;
-    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+   struct sockaddr_in serv_addr;
+   bzero(&serv_addr, sizeof(serv_addr));
 
-    struct sockaddr_in serv_addr;
-    bzero(&serv_addr, sizeof(serv_addr));
+   serv_addr.sin_addr.s_addr = INADDR_ANY;
+   serv_addr.sin_family = AF_INET;
+   serv_addr.sin_port = htons(PORT);
 
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(PORT);
+   if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr))<0){
+      stop("Error on biding");
+   }
 
-    if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr))<0){
-       stop("Error on biding");
-    }
+   struct sockaddr_in cli_addr;
+   socklen_t addrlen = sizeof(cli_addr);
 
-    struct sockaddr_in cli_addr;
-    socklen_t addrlen = sizeof(cli_addr);
+   int nbbytes = recvfrom(sockfd,data,max_len, 0,(struct sockaddr*)&cli_addr,&addrlen);
 
-    int nbbytes = recvfrom(sockfd,data,max_len, 0,(struct sockaddr*)&cli_addr,&addrlen);
+   if (nbbytes < 0) {
+      stop("error recvfrom");
+   }
 
-     if (nbbytes < 0) {
-        stop("error recvfrom");
-    }
-
-    return nbbytes;
+   return nbbytes;
 
 }
 
