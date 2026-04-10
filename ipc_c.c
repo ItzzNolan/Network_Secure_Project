@@ -41,7 +41,7 @@ int i1_envoyer_message(const char *data, int vers_reseau) {
 }
 
 /**
- * À appeler par le coordinateur quand il y a des données sur le port 9999.
+ * À appeler quand il y a des données sur le port 9999.
  * Elle ne boucle pas : elle traite UN message et rend la main.
  */
 char* i1_traiter_entree_python(int fd_ipc) {
