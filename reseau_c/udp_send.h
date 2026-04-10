@@ -2,7 +2,7 @@
 #define UDPSEND_H
 
 extern void stop (char* s);
-extern int udp_send(const void* data, size_t len);
-extern void message_send(char* json);
+extern int udp_send(const void* data);
+//extern void message_send(char* json);
 
 #endif
