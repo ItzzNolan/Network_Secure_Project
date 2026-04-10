@@ -10,6 +10,7 @@
 
 #define PORT 12345
 #define MAX_DGRAM_SIZE 1400
+#define BUFLEN 2000
 
 
 void stop(char *s){
@@ -17,8 +18,8 @@ void stop(char *s){
    exit(1);
 }
 
-int udp_recv(const void* data, size_t max_len){
-   int sockfd =socket(AF_INET, SOCK_DGRAM,0); 
+int udp_recv(){
+   int sockfd = socket(AF_INET, SOCK_DGRAM,0); 
    if(sockfd < -1){
       stop("error socket");
         
@@ -37,17 +38,22 @@ int udp_recv(const void* data, size_t max_len){
       stop("Error on biding");
    }
 
+   char message[BUFLEN+1];
+
    struct sockaddr_in cli_addr;
    socklen_t addrlen = sizeof(cli_addr);
 
-   int nbbytes = recvfrom(sockfd,data,max_len, 0,(struct sockaddr*)&cli_addr,&addrlen);
+   do{
+      bzero(&message, BUFLEN+1);
+      int nbbytes = recvfrom(sockfd,message,BUFLEN, 0,(struct sockaddr*)&cli_addr,&addrlen);
 
-   if (nbbytes < 0) {
-      stop("error recvfrom");
-   }
+      if (nbbytes < 0) {
+         stop("error recvfrom");
+      }
 
-   return nbbytes;
-
+      message[nbbytes]='\0';
+   }while(1);
+   close(sockfd);
 }
 
 
