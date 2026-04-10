@@ -520,7 +520,7 @@ class ColonelTURTLE(General):
                 continue
 
             #Maintien de la formation
-            form_up = 1 if unit.unit_class != "Archer" else 2
+            form_up = 1 if unit.Unit != "Archer" else 2
 
             if game.distance_tiles(unit.coords, center) > form_up:
                 step = MajorDAFT._neighbour_step_towards(self, unit.coords, center, occupied-{unit.coords}, game)

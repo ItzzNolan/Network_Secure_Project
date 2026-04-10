@@ -6,8 +6,8 @@ def build_parser():
     
     run_parser = subparsers.add_parser("run")
     run_parser.add_argument("scenario", type=str)
-    run_parser.add_argument("ai1", type=str)
-    run_parser.add_argument("ai2", type=str)
+    run_parser.add_argument("ai1", nargs="?", default=None)
+    run_parser.add_argument("ai2", nargs="?", default=None)
     run_parser.add_argument("-t", action="store_true")
     run_parser.add_argument("-d", type=str, default=None, metavar="DATAFILE")
     run_parser.add_argument("-m", "--map-size", type=int, default=30, metavar="SIZE",
