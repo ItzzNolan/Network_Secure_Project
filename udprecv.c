@@ -6,10 +6,10 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <unistd.h>
+#include "ipc_c.h"
 
 
 #define PORT 12345
-#define MAX_DGRAM_SIZE 1400
 #define BUFLEN 2000
 
 
@@ -52,6 +52,10 @@ int udp_recv(){
       }
 
       message[nbbytes]='\0';
+
+      if(int em = i1_envoyer_message(message, 0) < 0){
+         stop("error send message");
+      }
    }while(1);
    close(sockfd);
 }
