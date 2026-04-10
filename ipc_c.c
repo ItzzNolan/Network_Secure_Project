@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <cjson/cJSON.h>
+#include <ipc_c.h>
 
 #define PORT_PY_LOCAL 9998
 #define PORT_RESEAU 12345
