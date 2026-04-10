@@ -1,82 +1,141 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <stdint.h>
-#include <arpa/inet.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+#include <stdio.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/udp.h>
+#include <netdb.h>
+#include <strings.h>
 #include <unistd.h>
+#include <time.h>
+#include <arpa/inet.h>
 
-#define CHUNK_SIZE 1400
-#define MAX_FRAGMENTS 1024
+#define PORT 12345
+#define MAX_DGRAM_SIZE 1400
 
-typedef struct {
-    uint16_t total_frag;
-    uint16_t frag_index;
-} udp_header_t;
-
-message_recv(int fd, char *buffer, int buffer_size, struct sockaddr_in *sender){
-    static char *fragments[MAX_FRAGMENTS];
-    static int received_count = 0;
-    static int total_frag = 0;
-    static int init = 0;
-
-    if (!init) {
-        for (int i = 0; i < MAX_FRAGMENTS; i++)
-            fragments[i] = NULL;
-        init = 1;
-    }
-
-    char recv_buf[CHUNK_SIZE + sizeof(udp_header_t)];
-    socklen_t addr_len = sizeof(*sender);
-
-    int bytes = recvfrom(fd, recv_buf, sizeof(recv_buf), 0,
-                         (struct sockaddr*)sender, &addr_len);
-    if (bytes < sizeof(udp_header_t)){
-        return EXIT_FAILURE;
-    }
-
-    udp_header_t header;
-    memcpy(&header, recv_buf, sizeof(udp_header_t));
-    header.total_frag = ntohs(header.total_frag);
-    header.frag_index = ntohs(header.frag_index);
-
-    if (total_frag == 0){
-        total_frag = header.total_frag;
-    } 
-
-    int frag_size = bytes - sizeof(udp_header_t);
-    fragments[header.frag_index] = malloc(frag_size);
-    memcpy(fragments[header.frag_index], recv_buf + sizeof(udp_header_t), frag_size);
-
-    received_count++;
-
-    if (received_count == total_frag) {
-        int total_size = 0;
-        for (int i = 0; i < total_frag - 1; i++) total_size += CHUNK_SIZE;
-        total_size += frag_size; // le dernier fragment
-
-        if (total_size > buffer_size - 1) total_size = buffer_size - 1; //pour la sécurité
-        char *ptr = buffer;
-        for (int i = 0; i < total_frag; i++) {
-            int size = (i == total_frag - 1) ? frag_size : CHUNK_SIZE;
-            if (ptr - buffer + size > buffer_size - 1) size = buffer_size - 1 - (ptr - buffer);
-            memcpy(ptr, fragments[i], size);
-            ptr += size;
-            free(fragments[i]);
-            fragments[i] = NULL;
-        }
-        *ptr = '\0';
-
-        // Reset pour le prochain message
-        received_count = 0;
-        total_frag = 0;
-
-        return ptr - buffer; // taille du JSON
-    }
-
-    return EXIT_SUCCESS; 
+void stop(char *s){
+   perror(s);
+   exit(1);
 }
 
+int udp_recv(const void* data, size_t max_len){
+
+    if(sockfd == -1){
+        socket(AF_INET, SOCK_DGRAM,0); //pour ne pas recréer la socket a chaque fois
+        if(sockfd <0){
+            stop("error socket");
+        }
+    }
+    int opt = 1;
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    struct sockaddr_in serv_addr;
+    bzero(&serv_addr, sizeof(serv_addr));
+
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(PORT);
+
+    if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr))<0){
+       stop("Error on biding");
+    }
+
+    struct sockaddr_in cli_addr;
+    socklen_t addrlen = sizeof(cli_addr);
+
+    int nbbytes = recvfrom(sockfd,data,max_len, 0,(struct sockaddr*)&cli_addr,&addrlen);
+
+     if (nbbytes < 0) {
+        stop("error recvfrom");
+    }
+
+    return nbbytes;
+
+}
+
+
+
+
+
+char* message_receive() {
+    char buffer[MAX_DGRAM_SIZE];
+
+    int recv_len = udp_recv(buffer, sizeof(buffer));
+    if (recv_len <= 0) {
+        return NULL;
+    }
+
+    int header_size = sizeof(uint32_t) + 2*sizeof(uint16_t);
+
+    // Pas de fragmentation, 1 seul appel
+    if (recv_len < header_size) {
+        char* msg = malloc(recv_len + 1);
+        memcpy(msg, buffer, recv_len);
+        msg[recv_len] = '\0';
+        return msg;
+    }
+
+    // lire le header
+    uint32_t msg_id = ntohl(*(uint32_t*)buffer);
+    uint16_t total  = ntohs(*(uint16_t*)(buffer + sizeof(uint32_t)));
+    uint16_t index  = ntohs(*(uint16_t*)(buffer + sizeof(uint32_t) + sizeof(uint16_t)));
+
+    // allocation du tableaux pour les fragments
+    char** fragments = calloc(total, sizeof(char*));
+    int* sizes = calloc(total, sizeof(int));
+
+    // stocker 1er fragment
+    int payload_size = recv_len - header_size;
+    fragments[index] = malloc(payload_size);
+    memcpy(fragments[index], buffer + header_size, payload_size);
+    sizes[index] = payload_size;
+
+    int received = 1;
+
+    //ensuite les autres
+    while (received < total) {
+        recv_len = udp_recv(buffer, sizeof(buffer));
+        if (recv_len <= 0) continue;
+
+        uint32_t mid = ntohl(*(uint32_t*)buffer);
+        if (mid != msg_id) continue; // ignorer les autres messages
+
+        uint16_t idx = ntohs(*(uint16_t*)(buffer + sizeof(uint32_t)));
+
+        if (fragments[idx] != NULL) continue; // on a déjà reçu
+
+        int size = recv_len - header_size;
+        fragments[idx] = malloc(size);
+        memcpy(fragments[idx], buffer + header_size, size);
+        sizes[idx] = size;
+
+        received++;
+    }
+
+    // on réuni les fragments pour faire le message
+    int total_size = 0;
+    for (int i = 0; i < total; i++) {
+        total_size += sizes[i];
+    }
+
+    char* message = malloc(total_size + 1);
+    int offset = 0;
+
+    for (int i = 0; i < total; i++) {
+        memcpy(message + offset, fragments[i], sizes[i]);
+        offset += sizes[i];
+        free(fragments[i]);
+    }
+
+    message[total_size] = '\0';
+
+    free(fragments);
+    free(sizes);
+
+    return message;
+}
 
 int main(int argc, char *argv[]){
 }
