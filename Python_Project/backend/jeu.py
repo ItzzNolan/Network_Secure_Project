@@ -5,6 +5,7 @@ from backend.carte import Carte
 from backend.Units import Unit
 from ia.general import General, Action, TypeAction, make_general
 from ipc.ipc_python import IPCClient   # ajout d'un client IPC pour la communication avec l'interface graphique
+from moteur.propriete import Propriete
 
 class Jeu:
     def __init__(self, general_bleu: str = "braindead", general_rouge: str = "braindead", 
@@ -16,8 +17,8 @@ class Jeu:
         self.next_player_id = 0
 
         self.ipc = IPCClient()  # initialisation du client IPC
-       
         self.player_id = 0  # ou paramètre plus tard
+        self.propriete = Propriete(self.player_id, self.ipc) 
         
         #print(f"[JEU] General Bleu: {self.generaux[0].name}")
         #print(f"[JEU] General Rouge: {self.generaux[1].name}")
