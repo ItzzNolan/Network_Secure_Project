@@ -20,8 +20,9 @@ void stop(char *s){
    exit(1);
 }
 
-int udp_send(const void* data, size_t len){
+int udp_send(const void* data){
    int sockfd;
+   size_t len = strlen(data);
    if ((sockfd=socket(AF_INET,SOCK_DGRAM,0))<0){
       stop("socket creation failed");
    }
@@ -47,6 +48,7 @@ int udp_send(const void* data, size_t len){
    return EXIT_SUCCESS;
 }
 
+/*
 void message_send(char* json){
    size_t len = strlen(json);
 
@@ -56,12 +58,13 @@ void message_send(char* json){
    // Un seul packet
    if (len <= MAX_DGRAM_SIZE) {
       udp_send(json, len);
-      return;
+      //return;
    }
 
    // Plusieurs packets
    uint32_t msg_id = rand();
-   int total = (len + max_payload - 1) / max_payload;
+   int total = (len / max_payload) + 1;
+   printf("c%d\n",total);
 
    for (int i = 0; i < total; i++) {
 
@@ -83,7 +86,10 @@ void message_send(char* json){
       udp_send(buffer, header_size + chunk_size);
    }
 }
+*/
 
+/*
 int main(int argc, char*argv[]){
-
+   udp_send(argv[1]);
 }
+*/
