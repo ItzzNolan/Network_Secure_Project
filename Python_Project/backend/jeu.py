@@ -12,17 +12,36 @@ class Jeu:
         self.carte = Carte(largeur=largeur, hauteur=hauteur)
         self.unites: List[Unit] = []
         self._tour = 0
-        self.generaux: Dict[int, General] = {
-            0: make_general(general_bleu, id_player=0),
-            1: make_general(general_rouge, id_player=1)
-        }
+        self.generaux: Dict[int, General] = {}
+        self.next_player_id = 0
+
         self.ipc = IPCClient()  # initialisation du client IPC
        
         self.player_id = 0  # ou paramètre plus tard
         
-        print(f"[JEU] General Bleu: {self.generaux[0].name}")
-        print(f"[JEU] General Rouge: {self.generaux[1].name}")
-        print(f"[JEU] Carte: {largeur}x{hauteur}")
+        #print(f"[JEU] General Bleu: {self.generaux[0].name}")
+        #print(f"[JEU] General Rouge: {self.generaux[1].name}")
+        #print(f"[JEU] Carte: {largeur}x{hauteur}")
+    def ajouter_joueur(self, ia_name:str, units_config:dict):
+        pid = self.next_player_id
+        self.next_player_id += 1
+
+        general = make_general(ia_name, id_player=pid)
+        self.generaux[pid] = general
+
+        print(f"[JEU] Nouveau joueur {pid} avec IA: {general.name}")
+
+        #Spawn units
+        self._spawn_units_for_player(pid, units_config)
+
+        return pid
+
+    def _spawn_units_for_player(self, player_id:int, units_config:dict):
+        for unit_type,count in units_config.items():
+            for _ in range(count):
+                x = random.randint(0, self.carte.largeur-1)
+                y = random.randint(0, self.carte.hauteur-1)
+                self.ajouter_unite(unit_type, x, y, player_id)
 
 
     @property
@@ -244,16 +263,34 @@ class Jeu:
         for action in attack_actions:
             self._executer_action(action)
 
-    def check_victory(self) -> Optional[int]:
-        alive_0 = [u for u in self.unites if u.alive and u.equipe == 0]
-        alive_1 = [u for u in self.unites if u.alive and u.equipe == 1]
-        
-        if not alive_0 and alive_1:
-            return 1
-        if not alive_1 and alive_0:
-            return 2
-        if not alive_0 and not alive_1:
-            return 0
+    def check_victory(self):
+        alive_by_team = {}
+
+        for unit in self.unites:
+            if unit is None:
+                continue
+            if not getattr(unit, "alive", False):
+                continue
+
+            team = getattr(unit, "equipe", None)
+            if team is None:
+                continue
+
+            alive_by_team[team] = alive_by_team.get(team, 0)+1
+
+        print("DEBUG TEAMS:", alive_by_team)
+
+        alive_teams = [t for t,c in alive_by_team.items() if c>0]
+
+        if len(self.generaux)<2:
+            return None
+
+        if len(alive_teams)==0:
+            return -1
+
+        if len(alive_teams)==1:
+            return alive_teams[0]
+
         return None
 
     def trouver_ennemi_proche(self, unite):
