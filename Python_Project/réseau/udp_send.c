@@ -15,11 +15,7 @@
 #define PORT 12345
 #define MAX_DGRAM_SIZE 1400
 
-void stop(char *s){
-   perror(s);
-   exit(1);
-}
-
+extern void stop(char *s);
 int udp_send(const void* data){
    int sockfd;
    size_t len = strlen(data);

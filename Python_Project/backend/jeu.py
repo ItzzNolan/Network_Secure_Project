@@ -4,98 +4,26 @@ from typing import List, Optional, Dict
 from backend.carte import Carte
 from backend.Units import Unit
 from ia.general import General, Action, TypeAction, make_general
-from ipc.ipc_python import IPCClient   # ajout d'un client IPC pour la communication avec l'interface graphique
-
-def generer_player_id():
-        try:
-            with open("players.txt", "r") as f:
-                n = int(f.read().strip())
-        except:
-            n = 0
-
-        player_id = n
-
-        with open("players.txt", "w") as f:
-            f.write(str(n + 1))
-
-        return player_id
 
 class Jeu:
     def __init__(self, general_bleu: str = "braindead", general_rouge: str = "braindead", 
-                 largeur: int = 120, hauteur: int = 120):
-        self.carte = Carte(largeur=largeur, hauteur=hauteur)
-        self.unites: List[Unit] = []
-        self._tour = 0
-        self.generaux: Dict[int, General] = {} # player_id -> General pas de limitation à 2 joueurs
+                    largeur: int = 120, hauteur: int = 120):
+            self.carte = Carte(largeur=largeur, hauteur=hauteur)
+            self.unites: List[Unit] = []
+            self._tour = 0
+            self.generaux: Dict[int, General] = {}
+            self.next_player_id = 0
+            self.ipc = None
 
-        '''Objectif général de cette partie: un joueur peut rejoindre une partie en cours et voir la scène complète, et les autres voient ses unités apparaître.
-        # lors du lancement du jeu, le message JOIN ets envoyé avec toutes les infos des unités (type, position, stats) et l'envoie via IPC
-        self.appliquer_message({
-            "type": "JOIN",
-            "player_id": self.player_id,  # au lieu de 0
-            "units": [{"entity_id": u.id,"unit_type": u.Unit, "x": u.coords[0], "y": u.coords[1],"hp": u.HP, "version": u.version} for u in self.unites if u.alive]
-        })
-
-        # après avoir reçu JOIN, on envoie un message FULL_STATE pour que l'interface graphique ait toutes les infos nécessaires pour afficher la carte et les unités
-        if type == "join":
-            self.ipc.envoyer({
-                "type": "FULL_STATE",
-                "player_id": 0,
-                "entities": [{"entity_id": u.id,"owner_id": u.equipe, "unit_type": u.Unit, "x": u.coords[0], "y": u.coords[1],"hp": u.HP, "version": u.version} for u in self.unites if u.alive]
-            })
-        
-        # après avoir reçu FULL_STATE, le jeu est prêt à reconstruire la scène dans carte.py  /!\ il faut gérer le cas où on reçoit plusieurs FULL_STATE de plusieurs joueurs et qu'on doit fusionner sans doublons.
-        if type == "full_state":
-            entities = message.get("entities", [])
-            for entity in entities:
-                unit_type = entity.get("unit_type")
-                equipe=entity.get("owner_id")
-                x = entity.get("x")
-                y = entity.get("y")
-                hp = entity.get("hp")
-                version = entity.get("version")
-                unit = self.get_unit_by_id(entity_id)
-                if unit:
-                    unit.coords = (x, y)
-                    unit.HP = hp
-                    unit.version = version
-                    unit.equipe = equipe
-                    self.carte.placer_unite(unit, int(x), int(y))
-
-            # après avoir reçu DISCONNECT, il faut aussi mettre à jour la carte et les unités pour retirer les unités du joueur qui s'est déconnecté
-            if type == "disconnect":
-                if player_id in self.generaux:
-                    del self.generaux[player_id]
-                    print(f"[JEU] Player ID {player_id} left")
-                    for unit in self.unites:
-                        if unit and unit.equipe == player_id:
-                            unit.HP = 0
-                            unit.alive = False
-                            self.carte.retirer_unite(unit)
-                            self.unites[unit.id]=None
-        '''
-        self.couleur = (
-            random.randint(0,255),
-            random.randint(0,255),
-            random.randint(0,255)
-        )
-
-        self.ipc = IPCClient()  # initialisation du client IPC
-        self.player_id = generer_player_id()  # génération d'un ID unique pour ce joueur
-        self.generaux[self.player_id] = make_general("braindead", id_player=self.player_id) # à modifier plus tard pour que le joueur choisisse son IA
-        self.envoyer_join()  # envoie du message JOIN au lancement du jeu
-        
-        '''
-        print(f"[JEU] General Bleu: {self.generaux[0].name}")
-        print(f"[JEU] General Rouge: {self.generaux[1].name}")
-        print(f"[JEU] Carte: {largeur}x{hauteur}")
-        '''
-
-        for pid, general in self.generaux.items():
-            print(f"[JEU] Player {pid}: {general.name}")
-
-
-    @property
+            # ajouter les deux généraux
+            if general_bleu:
+                gen_bleu = make_general(general_bleu, id_player=0)
+                self.generaux[0] = gen_bleu
+                self.next_player_id = 1
+            if general_rouge:
+                gen_rouge = make_general(general_rouge, id_player=1)
+                self.generaux[1] = gen_rouge
+                self.next_player_id = 2
     def tick(self) -> int:
         return self._tour
     
@@ -159,6 +87,16 @@ class Jeu:
             self.unites.append(nouvelle_unite)
             self.carte.placer_unite(nouvelle_unite, x, y)
 
+    def ajouter_joueur(self, ia_name: str, units_config: dict):
+        pid = len(self.generaux)
+        self.generaux[pid] = make_general(ia_name, id_player=pid)
+        for unit_type, count in units_config.items():
+            for _ in range(count):
+                x = random.randint(0, self.carte.largeur - 1)
+                y = random.randint(0, self.carte.hauteur - 1)
+                self.ajouter_unite(unit_type, x, y, equipe=pid)
+        print(f"[JEU] Player {pid}: {ia_name} ajouté avec {sum(units_config.values())} unités")
+
     def get_unit_by_id(self, unit_id: int) -> Optional[Unit]:
         return self.unites[unit_id] if 0 <= unit_id < len(self.unites) else None
 
@@ -187,40 +125,16 @@ class Jeu:
             ratio = vitesse / distance
             unit.coords = (ux + dx * ratio, uy + dy * ratio)
 
-        # MAJ déplacement
-        self.ipc.envoyer({ # au lieu de print
-            "type": "UPDATE",
-            "action": "MOVE",
-            "entity_id": unit.id,
-            "x": unit.coords[0],
-            "y": unit.coords[1],
-            "player_id": unit.equipe
-        })
-
-    # JOIN
-    def envoyer_join(self):
-        units_data = []
-
-        for u in self.unites:
-            if u.coords:
-                units_data.append({
-                    "id": u.id,
-                    "type": u.Unit,
-                    "x": u.coords[0],
-                    "y": u.coords[1],
-                    "player_id": u.equipe
-                })
-
-        message = {
-            "type": "JOIN",
-            "player_id": self.player_id,  # au lieu de 0
-            "color": self.couleur,
-            "units": units_data
-        }
-
-        print("ENVOI JOIN:", message)
-        self.ipc.envoyer(message)
-
+        # RESEAU : envoyer le déplacement si IPC connecté
+        if self.ipc:
+            self.ipc.envoyer({
+                "type": "UPDATE",
+                "action": "MOVE",
+                "entity_id": unit.id,
+                "x": unit.coords[0],
+                "y": unit.coords[1],
+                "player_id": unit.equipe
+            })
 
     def _executer_attack(self, attacker: Unit, target: Unit):
         if not attacker.alive or not target.alive:
@@ -239,27 +153,29 @@ class Jeu:
             attacker.target = target
             attacker.inflict_damage()
 
-            # MAJ attaque
-            self.ipc.envoyer({ # au lieu de print
-                "type": "UPDATE",
-                "action": "ATTACK",
-                "attacker_id": attacker.id,
-                "target_id": target.id,
-                "damage": attacker.Attack if hasattr(attacker, "Attack") else 0,
-                "player_id": attacker.equipe
-            })
+            # RESEAU : envoyer l'attaque si IPC connecté
+            if self.ipc:
+                self.ipc.envoyer({
+                    "type": "UPDATE",
+                    "action": "ATTACK",
+                    "attacker_id": attacker.id,
+                    "target_id": target.id,
+                    "damage": attacker.Attack if hasattr(attacker, "Attack") else 0,
+                    "player_id": attacker.equipe
+                })
    
             if target.HP <= 0:
                 target.HP = 0
                 target.alive = False
 
-                # MAJ mort
-                self.ipc.envoyer({ # au lieu de print
-                    "type": "UPDATE",
-                    "action": "DIE",
-                    "entity_id": target.id,
-                    "player_id": attacker.equipe
-                })
+                # RESEAU : envoyer la mort si IPC connecté
+                if self.ipc:
+                    self.ipc.envoyer({
+                        "type": "UPDATE",
+                        "action": "DIE",
+                        "entity_id": target.id,
+                        "player_id": attacker.equipe
+                    })
 
     def _executer_action(self, action: Action):
         unit = self.get_unit_by_id(action.unit_id)
@@ -284,8 +200,13 @@ class Jeu:
                 self._executer_move(unit, action.target_pos)
 
     def mettre_a_jour(self):
-        # self.traiter_messages()
         self._tour += 1
+
+        # RESEAU : traiter les messages reçus
+        if self.ipc:
+            messages = self.ipc.recevoir()
+            for msg in messages:
+                self.appliquer_message(msg)
 
         for unit in self.unites:
             if hasattr(unit, 'timer'):
@@ -320,15 +241,18 @@ class Jeu:
             self._executer_action(action)
 
     def check_victory(self) -> Optional[int]:
-        alive_0 = [u for u in self.unites if u.alive and u.equipe == 0]
-        alive_1 = [u for u in self.unites if u.alive and u.equipe == 1]
+        if not self.unites:
+            return None
         
-        if not alive_0 and alive_1:
-            return 1
-        if not alive_1 and alive_0:
-            return 2
-        if not alive_0 and not alive_1:
-            return 0
+        equipes_vivantes = set()
+        for u in self.unites:
+            if u.alive:
+                equipes_vivantes.add(u.equipe)
+        
+        if len(equipes_vivantes) == 1:
+            return equipes_vivantes.pop()
+        elif len(equipes_vivantes) == 0:
+            return -1
         return None
 
     def trouver_ennemi_proche(self, unite):
@@ -342,91 +266,48 @@ class Jeu:
         self._executer_move(unite, (cible_x, cible_y))
         
     def appliquer_message(self, message: Dict):
-        type = message.get("type").lower()
-        player_id = int(message.get("player_id"))
-        if type == "join":
-            player_name = message.get("player_name", "Unknown")
-            units = message.get("units", [])
-            ia = message.get("ia")
-            self.generaux[player_id] = make_general(ia, id_player=player_id)
-            print(f"[JEU] Player {player_name} (ID: {player_id}) joined")
-            for unit_info in units:
-                entity_id = unit_info.get("entity_id")
-                unit_type = unit_info.get("unit_type")
-                x = unit_info.get("x")
-                y = unit_info.get("y")
-                self.ajouter_unite(nom_unite=unit_type, x=x, y=y, equipe=player_id)
-            entities = [{"entity_id": u.id,"owner_id": u.equipe, "unit_type": u.unit_type, "x": u.coords[0], "y": u.coords[1],"hp": u.HP, "version": u.version} for u in self.unites if u.alive]
-            self.ipc.envoyer({"type": "FULL_STATE", "player_id": 0, "entities": entities})
-        elif type == "full_state":
-            entities = message.get("entities", [])
-            for entity in entities:
-                unit_type = entity.get("unit_type")
-                equipe=entity.get("owner_id")
-                x = entity.get("x")
-                y = entity.get("y")
-                hp = entity.get("hp")
-                version = entity.get("version")
-                unit = self.get_unit_by_id(entity_id)
-                if unit:
-                    unit.coords = (x, y)
-                    unit.HP = hp
-                    unit.version = version
-                    unit.equipe = equipe
-                    self.carte.placer_unite(unit, int(x), int(y))
-        elif type == "update":
-            action = message.get("action")
-            if action=="move":
+        msg_type = message.get("type", "").lower()
+        player_id = message.get("player_id")
+
+        if msg_type == "update":
+            action = message.get("action", "").lower()
+            if action == "move":
                 entity_id = message.get("entity_id")
-                target_x = message.get("x")
-                target_y = message.get("y")
                 unit = self.get_unit_by_id(entity_id)
                 if unit and unit.alive:
-                    self._executer_move(unit, (target_x, target_y))
-            elif action=="attack":
-                attacker_id = message.get("attacker_id")
+                    unit.coords = (message.get("x"), message.get("y"))
+            elif action == "attack":
                 target_id = message.get("target_id")
-                attacker = self.get_unit_by_id(attacker_id)
                 target = self.get_unit_by_id(target_id)
-                if attacker and target and attacker.alive and target.alive:
-                    self._executer_attack(attacker, target)
-            elif action=="die":
+                damage = message.get("damage", 0)
+                if target and target.alive:
+                    target.HP -= damage
+                    if target.HP <= 0:
+                        target.alive = False
+            elif action == "die":
                 entity_id = message.get("entity_id")
                 unit = self.get_unit_by_id(entity_id)
                 if unit:
                     unit.HP = 0
                     unit.alive = False
-                self.unites[entity_id]=None
-                self.carte.retirer_unite(unit)
-        elif type == "disconnect":
+
+        elif msg_type == "join":
+            print(f"[JEU] Joueur {player_id} rejoint")
+            units = message.get("units", [])
+            for u in units:
+                self.ajouter_unite(u.get("unit_type", "Knight"), 
+                                   int(u.get("x", 0)), int(u.get("y", 0)), 
+                                   equipe=player_id)
+
+        elif msg_type == "disconnect":
+            print(f"[JEU] Joueur {player_id} quitte")
             if player_id in self.generaux:
                 del self.generaux[player_id]
-                print(f"[JEU] Player ID {player_id} left")
-                for unit in self.unites:
-                    if unit and unit.equipe == player_id:
-                        unit.HP = 0
-                        unit.alive = False
-                        self.carte.retirer_unite(unit)
-                        self.unites[unit.id]=None
-        else:
-            print(f"[JEU] Unknown message type: {type}")
+            for unit in self.unites:
+                if unit and unit.equipe == player_id:
+                    unit.alive = False
 
-    '''
-    def traiter_messages(self):
-        messages = self.ipc.recevoir()
-
-        for msg in messages:
-            print("RECU:", msg)
-
-            if msg.get("player_id") == self.player_id:
-                continue
-
-            self.appliquer_message(msg)
-    '''
-
-    # DISCONNECT
     def disconnect(self):
-        self.ipc.envoyer({
-            "type": "DISCONNECT",
-            "player_id": self.player_id # au lieu de 0
-        })
+        if self.ipc:
+            self.ipc.envoyer({"type": "DISCONNECT", "player_id": 0})
+            self.ipc.fermer()

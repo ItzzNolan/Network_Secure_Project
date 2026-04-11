@@ -11,11 +11,10 @@
 #define PORT 12345
 #define BUFLEN 2000
 
-void stop(char *s){
+extern void stop(char *s){
    perror(s);
    exit(1);
 }
-
 int udp_recv(){
    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
    if(sockfd < 0){

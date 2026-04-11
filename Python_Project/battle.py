@@ -2,7 +2,7 @@
 MedievAIl BAIttle GenerAIl - CLI Entry Point
 
 Usage:
-    battle run <scenario> <AI1> <AI2> [-t] [-d DATAFILE]
+    battle run <scenario> <AI1> <AI2> [-t] [-d DATAFILE] [--network]
     battle load <savefile>
     battle tourney [-G AI1 AI2 ...] [-S SCENARIO1 SCENARIO2] [-N=10] [-na]
     battle plot <AI> <plotter> <scenario_call> <range_arg> [-N=10]
@@ -92,29 +92,52 @@ def cmd_run(args):
     from backend.save_manager import SaveManager
 
     config = load_scenario_config(args.scenario)
-    map_size = args.map_size 
+    map_size = args.map_size
     print(f"\n[SCENARIO] {args.scenario}: {config.get('description', '')}")
     print(f"[UNITES] {config['units']}")
     print(f"[MAP] {map_size}x{map_size}")
-    partie = initialiser([args.ai1, args.ai2], config["units"], map_size=map_size)
+    ais = []
+
+    if args.ai1:
+        ais.append(args.ai1)
+    if args.ai2:
+        ais.append(args.ai2)
+
+    if ais:
+        partie = initialiser(ais, config["units"], map_size=map_size)
+    else:
+        from backend.jeu import Jeu
+        partie = Jeu(largeur=map_size, hauteur=map_size)
+
+    # RESEAU : brancher l'IPC si mode réseau
+    if hasattr(args, 'network') and args.network:
+        from ipc.ipc_python import IPCClient
+        partie.ipc = IPCClient(port_c=9999, port_python=9998)
+        print("[RESEAU] Mode réseau activé")
+
     manager_vue = ManagerVue(partie)
     save_manager = SaveManager()
     if args.t:
         manager_vue.mode_actuel = "TERMINAL"
-    
+
     clock = pygame.time.Clock()
     running = True
     paused = True
     game_tick = 0
     partie_terminee = False
     gagnant = None
-    
+
     print("\n" + "="*60)
     print("  MedievAIl BAIttle GenerAIl")
     print("="*60)
     print(f"  Scenario:      {args.scenario}")
-    print(f"  General Bleu:  {partie.generaux[0].name}")
-    print(f"  General Rouge: {partie.generaux[1].name}")
+    print("  Joueurs présents :")
+
+    if not partie.generaux:
+        print("Aucun joueur (appuie sur A pour en ajouter)")
+    else:
+        for pid, gen in partie.generaux.items():
+            print(f"Player {pid}: {gen.name}")
     print("-"*60)
     print("  CONTROLES:")
     print("  P             = Pause/Play")
@@ -126,48 +149,57 @@ def cmd_run(args):
     print("  R             = Recommencer")
     print("  ESC           = Quitter")
     print("="*60 + "\n")
-    
+
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False            
+                running = False
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
-                
+
                 elif event.key == pygame.K_p and not partie_terminee:
                     paused = not paused
                     manager_vue.vue_pygame.paused = paused
                     print("PAUSE" if paused else "EN JEU")
-                
+
                 elif event.key == pygame.K_F9:
                     manager_vue.changer_mode()
-                
+
                 elif event.key == pygame.K_F10:
                     manager_vue.vue_pygame.fullscreen = not manager_vue.vue_pygame.fullscreen
                     if manager_vue.vue_pygame.fullscreen:
-                       manager_vue.vue_pygame.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                        manager_vue.vue_pygame.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
                     else:
-                       manager_vue.vue_pygame.screen = pygame.display.set_mode(
-                         (manager_vue.vue_pygame.SCREEN_WIDTH, manager_vue.vue_pygame.SCREEN_HEIGHT))
-                    #pygame.display.toggle_fullscreen()
-                    #manager_vue.vue_pygame.fullscreen = not manager_vue.vue_pygame.fullscreen
+                        manager_vue.vue_pygame.screen = pygame.display.set_mode(
+                            (manager_vue.vue_pygame.SCREEN_WIDTH, manager_vue.vue_pygame.SCREEN_HEIGHT))
+
                 elif event.key == pygame.K_F11:
                     save_manager.sauvegarder(partie)
                     print("Partie sauvegardee!")
-                
+
                 elif event.key == pygame.K_F12:
                     if save_manager.charger(partie):
                         partie_terminee = False
                         gagnant = None
                         print("Partie chargee!")
-                
+
                 elif event.key == pygame.K_TAB:
                     paused = True
                     manager_vue.vue_pygame.paused = True
                     save_manager.ouvrir_stats_html(partie)
                     print("Stats HTML ouvertes")
-                
+
+                elif event.key == pygame.K_a:
+                    paused = True
+                    manager_vue.vue_pygame.paused = True
+                    ia_name = choisir_ia_pygame(manager_vue.vue_pygame.screen)
+                    if ia_name:
+                        partie.ajouter_joueur(ia_name, config["units"])
+                        print(f"IA {ia_name} added")
+                    paused = False
+                    manager_vue.vue_pygame.paused = False
+
                 elif event.key == pygame.K_r:
                     partie = initialiser([args.ai1, args.ai2], config["units"], map_size=map_size)
                     manager_vue.jeu = partie
@@ -176,15 +208,15 @@ def cmd_run(args):
                     paused = True
                     manager_vue.vue_pygame.paused = True
                     print("Nouvelle partie!")
-                
+
                 elif event.key == pygame.K_SPACE:
                     if manager_vue.mode_actuel == "TERMINAL":
                         auto = manager_vue.vue_terminal.toggle_auto_follow()
                         print(f"Auto-follow: {'ON' if auto else 'OFF'}")
-        
+
         keys = pygame.key.get_pressed()
         shift = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
-        
+
         if manager_vue.mode_actuel == "PYGAME":
             manager_vue.vue_pygame.gerer_camera(keys)
         else:
@@ -195,35 +227,31 @@ def cmd_run(args):
             if game_tick >= 10:
                 game_tick = 0
                 partie.mettre_a_jour()
-                
+
                 result = partie.check_victory()
-                if result == 1:
+                if result is not None:
                     partie_terminee = True
-                    gagnant = "ROUGE"
-                    print(f"\n{'='*40}")
-                    print(f"  VICTOIRE {partie.generaux[1].name}!")
-                    print(f"  (Equipe Rouge)")
-                    print(f"{'='*40}\n")
-                elif result == 2:
-                    partie_terminee = True
-                    gagnant = "BLEU"
-                    print(f"\n{'='*40}")
-                    print(f"  VICTOIRE {partie.generaux[0].name}!")
-                    print(f"  (Equipe Bleu)")
-                    print(f"{'='*40}\n")
-                elif result == 0:
-                    partie_terminee = True
+
+                if result == -1:
                     gagnant = "EGALITE"
-                    print(f"\n{'='*40}")
-                    print(f"  EGALITE!")
-                    print(f"{'='*40}\n")
-        
+                    print("\n=== EGALITE ===\n")
+                elif result == 0:
+                    gagnant = "BLEU"
+                    print(f"\n=== VICTOIRE PLAYER {result} ===\n")
+                elif result == 1:
+                    gagnant = "ROUGE"
+                    print(f"\n=== VICTOIRE PLAYER {result} ===\n")
+
         manager_vue.afficher(partie_terminee=partie_terminee, gagnant=gagnant)
         pygame.display.flip()
         clock.tick(60)
-    
+
+    # RESEAU : déconnexion propre
+    if partie.ipc:
+        partie.disconnect()
+
     pygame.quit()
-  
+
     if args.d and gagnant:
         data = {
             "scenario": args.scenario,
@@ -242,16 +270,16 @@ def cmd_load(args):
     from backend.jeu import Jeu
     from backend.save_manager import SaveManager
     from frontend.manager_vue import ManagerVue
-    
+
     partie = Jeu()
     save_manager = SaveManager()
-    
+
     if not save_manager.charger(partie, args.savefile):
         print(f"Erreur: impossible de charger {args.savefile}")
         return
-    
+
     print(f"Partie chargee depuis {args.savefile}")
-    
+
     manager_vue = ManagerVue(partie)
     clock = pygame.time.Clock()
     running = True
@@ -259,7 +287,7 @@ def cmd_load(args):
     partie_terminee = False
     gagnant = None
     game_tick = 0
-    
+
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -286,17 +314,17 @@ def cmd_load(args):
                 elif event.key == pygame.K_TAB:
                     paused = True
                     save_manager.ouvrir_stats_html(partie)
-        
+
         keys = pygame.key.get_pressed()
         manager_vue.vue_pygame.gerer_camera(keys)
-        
+
         mouse_buttons = pygame.mouse.get_pressed()
         if not paused and not partie_terminee:
             game_tick += 1
             if game_tick >= 10:
                 game_tick = 0
                 partie.mettre_a_jour()
-                
+
                 result = partie.check_victory()
                 if result == 1:
                     partie_terminee = True
@@ -307,18 +335,18 @@ def cmd_load(args):
                 elif result == 0:
                     partie_terminee = True
                     gagnant = "EGALITE"
-        
+
         manager_vue.afficher(partie_terminee=partie_terminee, gagnant=gagnant)
         pygame.display.flip()
         clock.tick(60)
-    
+
     pygame.quit()
 
 
 def cmd_tourney(args):
     from scenario.play_tournament import tournoi
     from scenario.tournament_calcul import Tournament
-    
+
     generaux = args.G if args.G else ["braindead", "daft"]
     if args.S:
         scenarios_configs = {}
@@ -327,7 +355,7 @@ def cmd_tourney(args):
             scenarios_configs[s] = {"units": config["units"], "map_size": config.get("map_size", 120)}
     else:
         scenarios_configs = {"standard": {"units": {"Knight": 20, "Pikeman": 20, "Crossbowman": 20}, "map_size": 120}}
-    
+
     print("\n" + "="*60)
     print("  TOURNOI MedievAIl BAIttle GenerAIl")
     print("="*60)
@@ -340,7 +368,7 @@ def cmd_tourney(args):
     tournament = Tournament(generaux, all_scenarios)
     for scenario_name, config in scenarios_configs.items():
         print(f"\n>>> Scenario: {scenario_name} (map {config['map_size']}x{config['map_size']})")
-        tournoi(generaux, config["units"], args.N, not_alternate=args.na, 
+        tournoi(generaux, config["units"], args.N, not_alternate=args.na,
                 map_size=config["map_size"], scenario_name=scenario_name, tournament=tournament)
     tournament.generer_rapport_html()
 
@@ -352,7 +380,7 @@ def cmd_plot(args):
     print("  MODE ANALYSE : COMPARAISON LANCHESTER")
     print("="*60)
     match_list = re.search(r"\[(.*?)\]", args.scenario_call)
-    
+
     if match_list:
         raw_list = match_list.group(1)
         unit_types = [u.strip().strip("'").strip('"') for u in raw_list.split(',')]
@@ -369,9 +397,49 @@ def cmd_plot(args):
     print("-" * 60)
     lanchester.plot_lanchester(args.ai, unit_types, r_val, args.N)
 
+def choisir_ia_pygame(screen):
+    import pygame
+
+    font = pygame.font.SysFont(None, 40)
+    small_font = pygame.font.SysFont(None, 28)
+
+    ia_list = ["braindead", "daft", "turtle"]
+    selected = 0
+
+    clock = pygame.time.Clock()
+
+    while True:
+        screen.fill((30, 30, 30))
+
+        title = font.render("Choisir une IA", True, (255, 255, 255))
+        screen.blit(title, (50, 50))
+
+        for i, ia in enumerate(ia_list):
+            color = (255, 255, 0) if i == selected else (200, 200, 200)
+            txt = small_font.render(ia, True, color)
+            screen.blit(txt, (60, 120 + i * 40))
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return None
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    selected = (selected - 1) % len(ia_list)
+                elif event.key == pygame.K_DOWN:
+                    selected = (selected + 1) % len(ia_list)
+                elif event.key == pygame.K_RETURN:
+                    return ia_list[selected]
+                elif event.key == pygame.K_ESCAPE:
+                    return None
+
+        clock.tick(60)
+
 def main():
     args = parse_args()
-    
+
     if args.command == "run":
         cmd_run(args)
     elif args.command == "load":
