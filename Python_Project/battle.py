@@ -105,6 +105,12 @@ def cmd_run(args):
 
     if ais:
         partie = initialiser(ais, config["units"], map_size=map_size)
+        # RESEAU : brancher l'IPC si mode réseau
+        if hasattr(args, 'network') and args.network:
+            from ipc.ipc_python import IPCClient
+            partie.ipc = IPCClient(port_c=9999, port_python=9998)
+            partie.player_id = args.player_id if hasattr(args, 'player_id') else 1
+            print(f"[RESEAU] Mode réseau activé, joueur {partie.player_id}")
     else:
         from backend.jeu import Jeu
         partie = Jeu(largeur=map_size, hauteur=map_size)
