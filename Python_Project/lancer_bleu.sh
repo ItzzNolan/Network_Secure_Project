@@ -6,4 +6,4 @@ cd ~/Network_project/Network_Secure_Project/Python_Project
 sleep 1
 
 # lancer le jeu
-python3 battle.py run standard braindead daft --network --player-id 1
+python3 battle.py run standard braindead braindead --network --player-id 1
