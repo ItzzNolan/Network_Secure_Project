@@ -8,6 +8,9 @@ def build_parser():
     run_parser.add_argument("scenario", type=str)
     run_parser.add_argument("ai1", type=str)
     run_parser.add_argument("ai2", type=str)
+    # dans parse_args(), rajouter dans le sous-parser "run" :
+    run_parser.add_argument('--network', action='store_true', help='Mode réseau')
+    run_parser.add_argument('--player-id', type=int, default=1, help='ID du joueur')
     run_parser.add_argument("-t", action="store_true")
     run_parser.add_argument("-d", type=str, default=None, metavar="DATAFILE")
     run_parser.add_argument("-m", "--map-size", type=int, default=30, metavar="SIZE",
