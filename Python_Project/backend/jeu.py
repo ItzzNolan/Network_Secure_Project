@@ -161,35 +161,28 @@ class Jeu:
             return
 
         if dist <= portee + 1:
-            hp_avant = target.HP
             attacker.target = target
             attacker.inflict_damage()
-            degats = hp_avant - target.HP
 
-            # RESEAU : envoyer l'attaque SEULEMENT si c'est notre unité
-            if self.ipc and self.player_id is not None:
-                mon_equipe = self.player_id - 1
-                if attacker.equipe == mon_equipe:
-                    self.ipc.envoyer({
-                        "type": "UPDATE", "action": "ATTACK",
-                        "attacker_id": attacker.id, "target_id": target.id,
-                        "damage": degats,
-                        "player_id": self.player_id
-                    })
+            # RESEAU : envoyer l'attaque
+            if self.ipc:
+                self.ipc.envoyer({
+                    "type": "UPDATE", "action": "ATTACK",
+                    "attacker_id": attacker.id, "target_id": target.id,
+                    "player_id": attacker.equipe
+                })
 
             if target.HP <= 0:
                 target.HP = 0
                 target.alive = False
 
-                # RESEAU : envoyer la mort SEULEMENT si c'est nous qui avons tué
-                if self.ipc and self.player_id is not None:
-                    mon_equipe = self.player_id - 1
-                    if attacker.equipe == mon_equipe:
-                        self.ipc.envoyer({
-                            "type": "UPDATE", "action": "DIE",
-                            "entity_id": target.id,
-                            "player_id": self.player_id
-                        })
+                # RESEAU : envoyer la mort
+                if self.ipc:
+                    self.ipc.envoyer({
+                        "type": "UPDATE", "action": "DIE",
+                        "entity_id": target.id,
+                        "player_id": attacker.equipe
+                    })
 
     def _executer_action(self, action: Action):
         unit = self.get_unit_by_id(action.unit_id)
