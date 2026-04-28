@@ -225,18 +225,18 @@ def cmd_run(args):
                 partie.mettre_a_jour()
 
                 result = partie.check_victory()
-                if result is not None:
-                    partie_terminee = True
-                    if result==-1:
-                        gagnant_id = -1
-                        gagnant_label = "EGALITE"
-                        print("\n=== EGALITE ===\n")
-                    else:
-                        gagnant_id = result
-                        team_name = get_team_name(result)
-                        gen_name = partie.generaux[result].name if result in partie.generaux else "?"
-                        gagnant_label = f"{team_name} ({gen_name})"
-                        print(f"\n=== VICTOIRE PLAYER {result} — {gagnant_label} ===\n")
+                # if result is not None:
+                #     partie_terminee = True
+                #     if result==-1:
+                #         gagnant_id = -1
+                #         gagnant_label = "EGALITE"
+                #         print("\n=== EGALITE ===\n")
+                #     else:
+                #         gagnant_id = result
+                #         team_name = get_team_name(result)
+                #         gen_name = partie.generaux[result].name if result in partie.generaux else "?"
+                #         gagnant_label = f"{team_name} ({gen_name})"
+                #         print(f"\n=== VICTOIRE PLAYER {result} — {gagnant_label} ===\n")
 
         manager_vue.afficher(partie_terminee=partie_terminee, gagnant=gagnant_label, gagnant_id=gagnant_id)
         pygame.display.flip()
