@@ -46,9 +46,9 @@ git clone --branch projet_python_main --single-branch --depth 1 https://github.c
 Au préalable, il est fortement recommandé d'installer le dernier package python pour pouvoir lancer la simulation.
 Pour lancer la simulation, on vous encourage à utiliser cette syntaxe suivante et vous situer dans le repertoire locale dans lequel vous avez fait le clonage :
 
->   python3 battle.py run [type-scenario] [ia1] [ia2]
+>   python3 battle.py run [type-scenario]
 
 Par exemple :
 ```bash
-python3 battle.py run standard braindead daft
+python3 battle.py run standard
 ```
