@@ -42,7 +42,7 @@ int i1_envoyer_message(const char *data, int vers_reseau) {
 
 /**
  * À appeler quand il y a des données sur le port 9999.
- * Elle ne boucle pas : elle traite UN message et rend la main.
+ * Elle ne boucle pas : elle traite un message et rend la main.
  */
 char* i1_traiter_entree_python(int fd_ipc) {
     static char buffer[BUF_SIZE];
