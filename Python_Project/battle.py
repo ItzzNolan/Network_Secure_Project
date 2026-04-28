@@ -175,13 +175,15 @@ def cmd_run(args):
     
     def reception_message():
         global ipc, running, partie
-        message = []
+        liste_message = []
         while running:
-            message = ipc.recevoir()  # Traite les messages IPC en temps réel
-            if len(message) > 0:
-                partie.appliquer_message(message)
-            print(f"[IPC] Message recu: {message}")
-            message = []          
+            liste_message = ipc.recevoir()  # Traite les messages IPC en temps réel
+            if len(liste_message) > 0:
+                for msg in liste_message:
+                    print(f"[IPC] Message recu: {msg}")
+                    partie.appliquer_message(msg)
+                
+            liste_message = []          
     
     def pygame_loop():
         global manager_vue, partie_terminee, paused, partie, partie_terminee, gagnant_label, gagnant_id, running, clock
