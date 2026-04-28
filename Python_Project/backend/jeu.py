@@ -46,6 +46,9 @@ class Jeu:
         self.ipc = IPCClient()  # initialisation du client IPC
         self.player_id = 0  # ou paramètre plus tard
         self.propriete = Propriete(self.player_id, self.ipc) 
+    
+    def get_ipc(self):
+        return self.ipc
 
     def ajouter_joueur(self, ia_name:str, units_config:dict):
         pid = self.next_player_id

@@ -12,6 +12,8 @@ import sys
 import os
 import importlib
 import json
+from threading import Thread
+
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 parent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
@@ -90,8 +92,10 @@ def cmd_run(args):
     from scenario.play_tournament import initialiser
     from frontend.manager_vue import ManagerVue
     from backend.save_manager import SaveManager
-    from backend.jeu import get_team_name
-
+    from backend.jeu import get_team_name,Jeu
+    
+    global ipc, partie, running, paused, partie_terminee, game_tick,manager_vue, gagnant_label, gagnant_id, clock
+    
     config = load_scenario_config(args.scenario)
     map_size = args.map_size 
     ais = args.ais if args.ais else []
@@ -104,8 +108,9 @@ def cmd_run(args):
     if ais:
         partie = initialiser(ais, config["units"], map_size=map_size)
     else:
-        from backend.jeu import Jeu
         partie = Jeu(largeur=map_size, hauteur=map_size)
+    
+    ipc = partie.get_ipc()
 
     manager_vue = ManagerVue(partie)
     save_manager = SaveManager()
@@ -143,104 +148,132 @@ def cmd_run(args):
     print("  ESC           = Quitter")
     print("="*60 + "\n")
 
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
+    def tour_jeu():
+        global running, paused, partie_terminee, game_tick, partie, clock
+        while running:
+            if not paused and not partie_terminee:
+                game_tick += 1
+                if game_tick >= 10:
+                    game_tick = 0
+                    partie.mettre_a_jour()
 
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
+                    result = partie.check_victory()
+                    # if result is not None:
+                    #     partie_terminee = True
+                    #     if result==-1:
+                    #         gagnant_id = -1
+                    #         gagnant_label = "EGALITE"
+                    #         print("\n=== EGALITE ===\n")
+                    #     else:
+                    #         gagnant_id = result
+                    #         team_name = get_team_name(result)
+                    #         gen_name = partie.generaux[result].name if result in partie.generaux else "?"
+                    #         gagnant_label = f"{team_name} ({gen_name})"
+                    #         print(f"\n=== VICTOIRE PLAYER {result} — {gagnant_label} ===\n")
+            clock.tick(60)
+        
+    
+    def reception_message():
+        global ipc, running, partie
+        message = []
+        while running:
+            message = ipc.recevoir()  # Traite les messages IPC en temps réel
+            if len(message) > 0:
+                partie.appliquer_message(message)
+            print(f"[IPC] Message recu: {message}")
+            message = []          
+    
+    def pygame_loop():
+        global manager_vue, partie_terminee, paused, partie, partie_terminee, gagnant_label, gagnant_id, running, clock
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
                     running = False
 
-                elif event.key == pygame.K_p and not partie_terminee:
-                    paused = not paused
-                    manager_vue.vue_pygame.paused = paused
-                    print("PAUSE" if paused else "EN JEU")
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        running = False
 
-                elif event.key == pygame.K_F9:
-                    manager_vue.changer_mode()
+                    elif event.key == pygame.K_p and not partie_terminee:
+                        paused = not paused
+                        manager_vue.vue_pygame.paused = paused
+                        print("PAUSE" if paused else "EN JEU")
 
-                elif event.key == pygame.K_F10:
-                    manager_vue.vue_pygame.fullscreen = not manager_vue.vue_pygame.fullscreen
-                    if manager_vue.vue_pygame.fullscreen:
-                        manager_vue.vue_pygame.screen = pygame.display.set_mode((0,0), pygame.FULLSCREEN)
-                    else:
-                        manager_vue.vue_pygame.screen = pygame.display.set_mode((manager_vue.vue_pygame.SCREEN_WIDTH, manager_vue.vue_pygame.SCREEN_HEIGHT))
+                    elif event.key == pygame.K_F9:
+                        manager_vue.changer_mode()
 
-                elif event.key == pygame.K_F11:
-                    save_manager.sauvegarder(partie)
-                    print("Partie sauvegardee!")
+                    elif event.key == pygame.K_F10:
+                        manager_vue.vue_pygame.fullscreen = not manager_vue.vue_pygame.fullscreen
+                        if manager_vue.vue_pygame.fullscreen:
+                            manager_vue.vue_pygame.screen = pygame.display.set_mode((0,0), pygame.FULLSCREEN)
+                        else:
+                            manager_vue.vue_pygame.screen = pygame.display.set_mode((manager_vue.vue_pygame.SCREEN_WIDTH, manager_vue.vue_pygame.SCREEN_HEIGHT))
 
-                elif event.key == pygame.K_F12:
-                    if save_manager.charger(partie):
+                    elif event.key == pygame.K_F11:
+                        save_manager.sauvegarder(partie)
+                        print("Partie sauvegardee!")
+
+                    elif event.key == pygame.K_F12:
+                        if save_manager.charger(partie):
+                            partie_terminee = False
+                            gagnant_id = None
+                            gagnant_label = None
+                            print("Partie chargee!")
+
+                    elif event.key == pygame.K_TAB:
+                        paused = True
+                        manager_vue.vue_pygame.paused = True
+                        save_manager.ouvrir_stats_html(partie)
+                        print("Stats HTML ouvertes")
+
+                    elif event.key==pygame.K_a:
+                        #Ajout dynamique d'une IA supp
+                        paused = True
+                        manager_vue.vue_pygame.paused = True
+                        ia_name = choisir_ia_pygame(manager_vue.vue_pygame.screen)
+                        if ia_name:
+                            partie.ajouter_joueur(ia_name, config["units"])
+                            print(f"IA '{ia_name}' ajoutee (joueur {partie.next_player_id - 1})")
+                        paused = False
+                        manager_vue.vue_pygame.paused = False
+
+                    elif event.key == pygame.K_r:
+                        partie = initialiser(ais, config["units"], map_size=map_size)
+                        manager_vue.jeu = partie
                         partie_terminee = False
                         gagnant_id = None
                         gagnant_label = None
-                        print("Partie chargee!")
+                        paused = True
+                        manager_vue.vue_pygame.paused = True
+                        print("Nouvelle partie!")
 
-                elif event.key == pygame.K_TAB:
-                    paused = True
-                    manager_vue.vue_pygame.paused = True
-                    save_manager.ouvrir_stats_html(partie)
-                    print("Stats HTML ouvertes")
+                    elif event.key == pygame.K_SPACE:
+                        if manager_vue.mode_actuel == "TERMINAL":
+                            auto = manager_vue.vue_terminal.toggle_auto_follow()
+                            print(f"Auto-follow: {'ON' if auto else 'OFF'}")
+            keys = pygame.key.get_pressed()
+            shift = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
 
-                elif event.key==pygame.K_a:
-                    #Ajout dynamique d'une IA supp
-                    paused = True
-                    manager_vue.vue_pygame.paused = True
-                    ia_name = choisir_ia_pygame(manager_vue.vue_pygame.screen)
-                    if ia_name:
-                        partie.ajouter_joueur(ia_name, config["units"])
-                        print(f"IA '{ia_name}' ajoutee (joueur {partie.next_player_id - 1})")
-                    paused = False
-                    manager_vue.vue_pygame.paused = False
+            if manager_vue.mode_actuel == "PYGAME":
+                manager_vue.vue_pygame.gerer_camera(keys)
+            else:
+                manager_vue.vue_terminal.gerer_touches(keys, shift)
 
-                elif event.key == pygame.K_r:
-                    partie = initialiser(ais, config["units"], map_size=map_size)
-                    manager_vue.jeu = partie
-                    partie_terminee = False
-                    gagnant_id = None
-                    gagnant_label = None
-                    paused = True
-                    manager_vue.vue_pygame.paused = True
-                    print("Nouvelle partie!")
+            manager_vue.afficher(partie_terminee=partie_terminee, gagnant=gagnant_label, gagnant_id=gagnant_id)
+            pygame.display.flip()
+            clock.tick(60)  
 
-                elif event.key == pygame.K_SPACE:
-                    if manager_vue.mode_actuel == "TERMINAL":
-                        auto = manager_vue.vue_terminal.toggle_auto_follow()
-                        print(f"Auto-follow: {'ON' if auto else 'OFF'}")
+                
+    
+    # Create threads
+    thread1 = Thread(target=tour_jeu)
+    thread2 = Thread(target=reception_message)
 
-        keys = pygame.key.get_pressed()
-        shift = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
-
-        if manager_vue.mode_actuel == "PYGAME":
-            manager_vue.vue_pygame.gerer_camera(keys)
-        else:
-            manager_vue.vue_terminal.gerer_touches(keys, shift)
-
-        if not paused and not partie_terminee:
-            game_tick += 1
-            if game_tick >= 10:
-                game_tick = 0
-                partie.mettre_a_jour()
-
-                result = partie.check_victory()
-                # if result is not None:
-                #     partie_terminee = True
-                #     if result==-1:
-                #         gagnant_id = -1
-                #         gagnant_label = "EGALITE"
-                #         print("\n=== EGALITE ===\n")
-                #     else:
-                #         gagnant_id = result
-                #         team_name = get_team_name(result)
-                #         gen_name = partie.generaux[result].name if result in partie.generaux else "?"
-                #         gagnant_label = f"{team_name} ({gen_name})"
-                #         print(f"\n=== VICTOIRE PLAYER {result} — {gagnant_label} ===\n")
-
-        manager_vue.afficher(partie_terminee=partie_terminee, gagnant=gagnant_label, gagnant_id=gagnant_id)
-        pygame.display.flip()
-        clock.tick(60)
+    # Start threads
+    thread1.start()
+    thread2.start()
+    
+    pygame_loop()  # Utilisation du thread principal pour éviter les problèmes de Pygame
 
     pygame.quit()
 
