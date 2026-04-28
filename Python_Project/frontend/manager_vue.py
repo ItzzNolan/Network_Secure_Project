@@ -19,8 +19,8 @@ class ManagerVue:
             self.mode_actuel = "PYGAME"
             print("--- Passage en Vue Pygame ---")
 
-    def afficher(self, partie_terminee=False, gagnant=None):
+    def afficher(self, partie_terminee=False, gagnant=None, gagnant_id=None):
         if self.mode_actuel == "PYGAME":
-            self.vue_pygame.afficher(self.jeu, partie_terminee, gagnant)
+            self.vue_pygame.afficher(self.jeu, partie_terminee, gagnant, gagnant_id)
         else:
             self.vue_terminal.afficher(self.vue_pygame.screen, self.jeu, partie_terminee, gagnant)
