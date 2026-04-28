@@ -10,6 +10,7 @@ class Unit():
     def __init__(self,nomUnite):
         self.Unit = self.def_stat('Unit',nomUnite)
         self.HP = int(self.def_stat('HP',nomUnite))
+        self.unit_type = nomUnite
         #self.Type_Attack = self.def_stat('Type_Attack',nomUnite)
         #self.Attack = self.def_stat('Attack',nomUnite)
         #self.Armor = self.def_stat('Armor',nomUnite)
@@ -34,6 +35,7 @@ class Unit():
         self.target = None
         self.alive = True
         self.timer=0
+        self.version=1
 
     def def_stat(self, stat, nomUnite):
         """

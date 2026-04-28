@@ -3,11 +3,16 @@ from backend.Units import Unit
 from backend.jeu import Jeu
 from ia.general import MajorDAFT
 from frontend.vue_terminal import afficher
+#from backend.test_jeu import FakeNetwork
 
 def scenario_Crossbowman_vs_Knight():  
 
     # 1. Créer le jeu et la carte
-    jeu = Jeu(10, 10)
+    '''
+    network = FakeNetwork()
+    jeu = Jeu(10, 10, network=network)
+    '''
+    jeu = Jeu(10,10)
 
     # 2. Créer les généraux
     general_joueur1 = MajorDAFT(0)

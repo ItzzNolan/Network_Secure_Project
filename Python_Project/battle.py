@@ -96,7 +96,18 @@ def cmd_run(args):
     print(f"\n[SCENARIO] {args.scenario}: {config.get('description', '')}")
     print(f"[UNITES] {config['units']}")
     print(f"[MAP] {map_size}x{map_size}")
-    partie = initialiser([args.ai1, args.ai2], config["units"], map_size=map_size)
+    ais = []
+
+    if args.ai1:
+        ais.append(args.ai1)
+    if args.ai2:
+        ais.append(args.ai2)
+
+    if ais:
+        partie = initialiser(ais, config["units"], map_size=map_size)
+    else:
+        from backend.jeu import Jeu
+        partie = Jeu(largeur=map_size, hauteur=map_size)
     manager_vue = ManagerVue(partie)
     save_manager = SaveManager()
     if args.t:
@@ -113,8 +124,13 @@ def cmd_run(args):
     print("  MedievAIl BAIttle GenerAIl")
     print("="*60)
     print(f"  Scenario:      {args.scenario}")
-    print(f"  General Bleu:  {partie.generaux[0].name}")
-    print(f"  General Rouge: {partie.generaux[1].name}")
+    print("  Joueurs présents :")
+
+    if not partie.generaux:
+        print("Aucun joueur (appuie sur A pour en ajouter)")
+    else:
+        for pid,gen in partie.generaux.items():
+            print(f"Player {pid}: {gen.name}")
     print("-"*60)
     print("  CONTROLES:")
     print("  P             = Pause/Play")
@@ -168,6 +184,19 @@ def cmd_run(args):
                     save_manager.ouvrir_stats_html(partie)
                     print("Stats HTML ouvertes")
                 
+                elif event.key==pygame.K_a:
+                    paused = True
+                    manager_vue.vue_pygame.paused = True
+
+                    ia_name = choisir_ia_pygame(manager_vue.vue_pygame.screen)
+
+                    if ia_name:
+                        partie.ajouter_joueur(ia_name, config["units"])
+                        print(f"IA {ia_name} added")
+
+                    paused = False
+                    manager_vue.vue_pygame.paused = False
+                
                 elif event.key == pygame.K_r:
                     partie = initialiser([args.ai1, args.ai2], config["units"], map_size=map_size)
                     manager_vue.jeu = partie
@@ -197,26 +226,20 @@ def cmd_run(args):
                 partie.mettre_a_jour()
                 
                 result = partie.check_victory()
-                if result == 1:
+                if result is not None:
                     partie_terminee = True
-                    gagnant = "ROUGE"
-                    print(f"\n{'='*40}")
-                    print(f"  VICTOIRE {partie.generaux[1].name}!")
-                    print(f"  (Equipe Rouge)")
-                    print(f"{'='*40}\n")
-                elif result == 2:
-                    partie_terminee = True
-                    gagnant = "BLEU"
-                    print(f"\n{'='*40}")
-                    print(f"  VICTOIRE {partie.generaux[0].name}!")
-                    print(f"  (Equipe Bleu)")
-                    print(f"{'='*40}\n")
-                elif result == 0:
-                    partie_terminee = True
+
+                if result==-1:
                     gagnant = "EGALITE"
-                    print(f"\n{'='*40}")
-                    print(f"  EGALITE!")
-                    print(f"{'='*40}\n")
+                    print("\n=== EGALITE ===\n")
+
+                elif result==0:
+                    gagnant = "BLEU"
+                    print(f"\n=== VICTOIRE PLAYER {result} ===\n")
+                
+                elif result==1:
+                    gagnant = "ROUGE"
+                    print(f"\n=== VICTOIRE PLAYER {result} ===\n")
         
         manager_vue.afficher(partie_terminee=partie_terminee, gagnant=gagnant)
         pygame.display.flip()
@@ -368,6 +391,46 @@ def cmd_plot(args):
     print(f"  Valeurs de N      : {list(r_val)}")
     print("-" * 60)
     lanchester.plot_lanchester(args.ai, unit_types, r_val, args.N)
+
+def choisir_ia_pygame(screen):
+    import pygame
+
+    font = pygame.font.SysFont(None, 40)
+    small_font = pygame.font.SysFont(None, 28)
+
+    ia_list = ["braindead", "daft", "turtle"]
+    selected = 0
+
+    clock = pygame.time.Clock()
+
+    while True:
+        screen.fill((30, 30, 30))
+
+        title = font.render("Choisir une IA", True, (255, 255, 255))
+        screen.blit(title, (50, 50))
+
+        for i, ia in enumerate(ia_list):
+            color = (255, 255, 0) if i == selected else (200, 200, 200)
+            txt = small_font.render(ia, True, color)
+            screen.blit(txt, (60, 120 + i * 40))
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return None
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    selected = (selected - 1) % len(ia_list)
+                elif event.key == pygame.K_DOWN:
+                    selected = (selected + 1) % len(ia_list)
+                elif event.key == pygame.K_RETURN:
+                    return ia_list[selected]
+                elif event.key == pygame.K_ESCAPE:
+                    return None
+
+        clock.tick(60)
 
 def main():
     args = parse_args()
