@@ -98,16 +98,27 @@ def cmd_run(args):
     print(f"[MAP] {map_size}x{map_size}")
     ais = []
 
-    if args.ai1:
-        ais.append(args.ai1)
-    if args.ai2:
-        ais.append(args.ai2)
-
-    if ais:
+    # Si on est en réseau, on ne charge QUE notre IA locale !
+    if hasattr(args, 'network') and args.network:
+        # Si je suis le joueur 1, je charge args.ai1. Si je suis joueur 2, je charge args.ai2
+        mon_ia = args.ai1 if args.player_id == 1 else args.ai2
+        ais.append(mon_ia)
         partie = initialiser(ais, config["units"], map_size=map_size)
+
+        # On force notre équipe (0 pour J1, 1 pour J2) pour nos unités générées
+        mon_equipe = args.player_id - 1
+        for u in partie.unites:
+            u.equipe = mon_equipe
+
     else:
-        from backend.jeu import Jeu
-        partie = Jeu(largeur=map_size, hauteur=map_size)
+        # Jeu hors-ligne normal : on charge les deux
+        if args.ai1: ais.append(args.ai1)
+        if args.ai2: ais.append(args.ai2)
+        if ais:
+            partie = initialiser(ais, config["units"], map_size=map_size)
+        else:
+            from backend.jeu import Jeu
+            partie = Jeu(largeur=map_size, hauteur=map_size)
 
     # RESEAU : Une seule initialisation propre
     if hasattr(args, 'network') and args.network:

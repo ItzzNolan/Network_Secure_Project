@@ -343,6 +343,7 @@ class Jeu:
             if existing_unit:
                 existing_unit.coords = (u_data.get("x"), u_data.get("y"))
                 existing_unit.HP = u_data.get("hp", existing_unit.HP)
+                existing_unit.equipe = equipe_distante
             else:
                 nom_unite = u_data.get("unit_type", "pikeman")
                 nouvelle_unite = Unit(nomUnite=nom_unite)
