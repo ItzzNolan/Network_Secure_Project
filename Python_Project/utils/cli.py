@@ -6,24 +6,21 @@ def build_parser():
     
     run_parser = subparsers.add_parser("run")
     run_parser.add_argument("scenario", type=str)
-    run_parser.add_argument("ai1", nargs="?", default=None)
-    run_parser.add_argument("ai2", nargs="?", default=None)
+    run_parser.add_argument("ais", nargs="*", default=None, metavar="AI", help="Noms des IAs participantes (autant que voulu)")
     run_parser.add_argument("-t", action="store_true")
     run_parser.add_argument("-d", type=str, default=None, metavar="DATAFILE")
-    run_parser.add_argument("-m", "--map-size", type=int, default=30, metavar="SIZE",
-                        help="Taille de la carte NxN (defaut: 30, min requis: 120)")
-    
+    run_parser.add_argument("-m", "--map-size", type=int, default=30, metavar="SIZE", help="Taille de la carte NxN (defaut: 30)")
+
     load_parser = subparsers.add_parser("load")
     load_parser.add_argument("savefile", type=str)
-    
+
     tourney_parser = subparsers.add_parser("tourney")
     tourney_parser.add_argument("-G", nargs="+", default=None, metavar="AI")
     tourney_parser.add_argument("-S", nargs="+", default=None, metavar="SCENARIO")
     tourney_parser.add_argument("-N", type=int, default=10)
     tourney_parser.add_argument("-na", action="store_true")
-    tourney_parser.add_argument("-m", "--map-size", type=int, default=30, metavar="SIZE",
-                            help="Taille de la carte NxN (defaut: 30)")
-    
+    tourney_parser.add_argument("-m", "--map-size", type=int, default=30, metavar="SIZE", help="Taille de la carte NxN (defaut: 30)")
+
     plot_parser = subparsers.add_parser("plot")
     plot_parser.add_argument("ai", type=str)
     plot_parser.add_argument("plotter", type=str)

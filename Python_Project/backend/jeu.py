@@ -7,9 +7,36 @@ from ia.general import General, Action, TypeAction, make_general
 from ipc.ipc_python import IPCClient   # ajout d'un client IPC pour la communication avec l'interface graphique
 from moteur.propriete import Propriete
 
+TEAM_COLORS = [
+    (70, 130, 255),   #BLEU
+    (255, 70,  70),   #ROUGE
+    (80,  200, 80),   #VERT
+    (255, 200, 50),   #JAUNE
+    (200, 80,  255),  #VIOLET
+    (255, 150, 50),   #ORANGE
+    (80,  220, 220),  #CYAN
+    (255, 120, 180),  #ROSE
+    (150, 75,  0),    #MARRON
+    (0,   0,   0),    #NOIR
+    (255, 255, 255),  #BLANC
+    (128, 128, 128),  #GRIS
+    (0,   100, 0),    #VERT FONCÉ
+    (0,   0,   139),  #BLEU FONCÉ
+    (139, 0,   0),    #ROUGE FONCÉ
+    (255, 215, 0),    #OR
+]
+
+TEAM_NAMES = ["BLEU", "ROUGE", "VERT", "JAUNE", "VIOLET", "ORANGE", "CYAN", "ROSE", "MARRON", "NOIR", "BLANC", "GRIS", "VERT_FONCE", "BLEU_FONCE", "ROUGE_FONCE", "OR"]
+
+def get_team_color(team_id:int):
+    return TEAM_COLORS[team_id % len(TEAM_COLORS)]
+
+def get_team_name(team_id:int):
+    return TEAM_NAMES[team_id % len(TEAM_NAMES)]
+
+
 class Jeu:
-    def __init__(self, general_bleu: str = "braindead", general_rouge: str = "braindead", 
-                 largeur: int = 120, hauteur: int = 120):
+    def __init__(self, largeur:int = 120, hauteur:int = 120):
         self.carte = Carte(largeur=largeur, hauteur=hauteur)
         self.unites: List[Unit] = []
         self._tour = 0
@@ -19,10 +46,10 @@ class Jeu:
         self.ipc = IPCClient()  # initialisation du client IPC
         self.player_id = 0  # ou paramètre plus tard
         self.propriete = Propriete(self.player_id, self.ipc) 
-        
-        #print(f"[JEU] General Bleu: {self.generaux[0].name}")
-        #print(f"[JEU] General Rouge: {self.generaux[1].name}")
-        #print(f"[JEU] Carte: {largeur}x{hauteur}")
+    
+    def get_ipc(self):
+        return self.ipc
+
     def ajouter_joueur(self, ia_name:str, units_config:dict):
         pid = self.next_player_id
         self.next_player_id += 1
@@ -30,20 +57,19 @@ class Jeu:
         general = make_general(ia_name, id_player=pid)
         self.generaux[pid] = general
 
-        print(f"[JEU] Nouveau joueur {pid} avec IA: {general.name}")
+        print(f"[JEU] Nouveau joueur {pid} ({get_team_name(pid)}) avec IA: {general.name}")
 
         #Spawn units
         self._spawn_units_for_player(pid, units_config)
 
         return pid
-
-    def _spawn_units_for_player(self, player_id:int, units_config:dict):
+    
+    def _spawn_units_for_player(self, player_id: int, units_config: dict):
         for unit_type,count in units_config.items():
             for _ in range(count):
                 x = random.randint(0, self.carte.largeur-1)
                 y = random.randint(0, self.carte.hauteur-1)
                 self.ajouter_unite(unit_type, x, y, player_id)
-
 
     @property
     def tick(self) -> int:
@@ -110,7 +136,10 @@ class Jeu:
             self.carte.placer_unite(nouvelle_unite, x, y)
 
     def get_unit_by_id(self, unit_id: int) -> Optional[Unit]:
-        return self.unites[unit_id] if 0 <= unit_id < len(self.unites) else None
+        for u in self.unites:
+            if u.id == unit_id:
+                return u
+        return None
 
     def _executer_move(self, unit: Unit, target_pos):
         if unit.coords is None or target_pos is None:
@@ -118,16 +147,12 @@ class Jeu:
         
         ux, uy = unit.coords
         tx, ty = target_pos
-        
+
         dx = tx - ux
         dy = ty - uy
-        
-        vitesse = getattr(unit, 'Speed', 1.0)
-        if vitesse is None:
-            vitesse = 1.0
-        
+        vitesse = getattr(unit, 'Speed', 1.0) or 1.0
         distance = math.sqrt(dx**2 + dy**2)
-        
+
         if distance < 0.1:
             return
         
@@ -136,7 +161,7 @@ class Jeu:
         else:
             ratio = vitesse / distance
             unit.coords = (ux + dx * ratio, uy + dy * ratio)
-
+        
         # MAJ déplacement
         self.ipc.envoyer({ # au lieu de print
             "type": "UPDATE",
@@ -167,17 +192,13 @@ class Jeu:
             "units": units_data
         })
 
-
     def _executer_attack(self, attacker: Unit, target: Unit):
         if not attacker.alive or not target.alive:
             return
         if attacker.coords is None or target.coords is None:
             return
         dist = self.distance_tiles(attacker.coords, target.coords)
-        portee = getattr(attacker, 'Max_Range', 1.5)
-        if portee is None:
-            portee = 1.5
-        
+        portee = getattr(attacker, 'Max_Range', 1.5) or 1.5
         if not attacker.can_attack():
             return
         
@@ -194,7 +215,7 @@ class Jeu:
                 "damage": attacker.Attack if hasattr(attacker, "Attack") else 0,
                 "player_id": attacker.equipe
             })
-   
+
             if target.HP <= 0:
                 target.HP = 0
                 target.alive = False
@@ -215,7 +236,7 @@ class Jeu:
         if action.type == TypeAction.MOVE:
             if action.target_pos:
                 self._executer_move(unit, action.target_pos)
-        
+
         elif action.type == TypeAction.ATTACK:
             if action.target_id is not None:
                 target = self.get_unit_by_id(action.target_id)
@@ -224,7 +245,7 @@ class Jeu:
         
         elif action.type == TypeAction.HOLD:
             pass
-        
+
         elif action.type == TypeAction.FORM_UP:
             if action.target_pos:
                 self._executer_move(unit, action.target_pos)
@@ -235,42 +256,44 @@ class Jeu:
         for unit in self.unites:
             if hasattr(unit, 'timer'):
                 unit.timer += 1
-        
+
         all_actions: List[Action] = []
-        
+
         equipes = list(self.generaux.items())
         random.shuffle(equipes)
-        
+
         for equipe, general in equipes:
             unites_equipe = [u for u in self.unites if u.alive and u.equipe == equipe and u.coords]
             
             if not unites_equipe:
                 continue
-            
+
             try:
                 actions = general.decider_actions(unites_equipe, self)
                 all_actions.extend(actions)
             except Exception as e:
                 print(f"[JEU] Erreur general {general.name}: {e}")
-        
+
         move_actions = [a for a in all_actions if a.type in [TypeAction.MOVE, TypeAction.FORM_UP]]
         attack_actions = [a for a in all_actions if a.type == TypeAction.ATTACK]
-        
+
         random.shuffle(move_actions)
         random.shuffle(attack_actions)
-        
+
         for action in move_actions:
             self._executer_action(action)
         for action in attack_actions:
             self._executer_action(action)
 
-    def check_victory(self):
-        alive_by_team = {}
+        self.unites = [u for u in self.unites if u.alive]
 
+    def check_victory(self):
+        if len(self.generaux)<2:
+            return None
+
+        alive_by_team:Dict[int, int] = {}
         for unit in self.unites:
-            if unit is None:
-                continue
-            if not getattr(unit, "alive", False):
+            if unit is None or not getattr(unit, "alive", False):
                 continue
 
             team = getattr(unit, "equipe", None)
@@ -279,12 +302,7 @@ class Jeu:
 
             alive_by_team[team] = alive_by_team.get(team, 0)+1
 
-        print("DEBUG TEAMS:", alive_by_team)
-
         alive_teams = [t for t,c in alive_by_team.items() if c>0]
-
-        if len(self.generaux)<2:
-            return None
 
         if len(alive_teams)==0:
             return -1
@@ -303,7 +321,7 @@ class Jeu:
 
     def deplacer_vers(self, unite, cible_x, cible_y):
         self._executer_move(unite, (cible_x, cible_y))
-        
+    
     def appliquer_message(self, message: Dict):
         type = message.get("type").lower()
         player_id = int(message.get("player_id"))
@@ -380,4 +398,3 @@ class Jeu:
             "type": "DISCONNECT",
             "player_id": self.player_id # au lieu de 0
         })
-
