@@ -13,6 +13,7 @@ import os
 import importlib
 import json
 
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 parent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 sys.path.append(parent_dir)
@@ -103,26 +104,26 @@ def cmd_run(args):
     if args.ai2:
         ais.append(args.ai2)
 
+    # Création de la partie (1 seule fois)
     if ais:
         partie = initialiser(ais, config["units"], map_size=map_size)
-        # RESEAU : brancher l'IPC si mode réseau
-        if hasattr(args, 'network') and args.network:
-            from ipc.ipc_python import IPCClient
-            partie.ipc = IPCClient(port_c=9999, port_python=9998)
-            partie.player_id = args.player_id if hasattr(args, 'player_id') else 1
-            print(f"[RESEAU] Mode réseau activé, joueur {partie.player_id}")
     else:
         from backend.jeu import Jeu
         partie = Jeu(largeur=map_size, hauteur=map_size)
 
-    # RESEAU : brancher l'IPC si mode réseau
+    # Initialisation Réseau (1 seule fois)
     if hasattr(args, 'network') and args.network:
         from ipc.ipc_python import IPCClient
+        partie.player_id = args.player_id if hasattr(args, 'player_id') else 1
         partie.ipc = IPCClient(port_c=9999, port_python=9998)
-        print("[RESEAU] Mode réseau activé")
+        
+        print(f"[RESEAU] Mode réseau activé, joueur {partie.player_id}")
+        partie.reseau_envoyer_join()
 
+    # Initialisation Vue (1 seule fois)
     manager_vue = ManagerVue(partie)
     save_manager = SaveManager()
+    
     if args.t:
         manager_vue.mode_actuel = "TERMINAL"
 
@@ -252,8 +253,7 @@ def cmd_run(args):
         pygame.display.flip()
         clock.tick(60)
 
-    # RESEAU : déconnexion propre
-    if partie.ipc:
+    if hasattr(partie, 'ipc') and partie.ipc:
         partie.disconnect()
 
     pygame.quit()
@@ -456,7 +456,6 @@ def main():
         cmd_plot(args)
     else:
         print("Commande inconnue. Utilisez --help pour l'aide.")
-
 
 if __name__ == "__main__":
     main()
