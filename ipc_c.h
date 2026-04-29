@@ -21,6 +21,7 @@
  * @return int 0 en cas de succès, -1 en cas d'erreur.
  */
 int i1_envoyer_message(const char *data, int vers_reseau);
+void i1_router_message_python(char *raw_json);
 
 /**
  * @brief Lit un message venant de Python, le valide et l'analyse.
@@ -32,4 +33,3 @@ int i1_envoyer_message(const char *data, int vers_reseau);
 char* i1_traiter_entree_python(int fd_ipc);
 
 #endif // IPC_INTERFACE_H
-/** c'est bon tous les fichiers compile donne moi une commande qui me prmet de testet le fonctionnement de tous des autres fichiers ensemble dans un test d'envoie localc */

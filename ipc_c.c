@@ -4,6 +4,10 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <cjson/cJSON.h>
+<<<<<<< HEAD
+=======
+#include "ipc_c.h"
+>>>>>>> b27404374e7cd2a70015c1e58bd1970f78831932
 
 #define PORT_PY_LOCAL 9998
 #define PORT_RESEAU 12345
@@ -40,8 +44,13 @@ int i1_envoyer_message(const char *data, int vers_reseau) {
 }
 
 /**
+<<<<<<< HEAD
  * À appeler par le coordinateur quand il y a des données sur le port 9999.
  * Elle ne boucle pas : elle traite UN message et rend la main.
+=======
+ * À appeler quand il y a des données sur le port 9999.
+ * Elle ne boucle pas : elle traite un message et rend la main.
+>>>>>>> b27404374e7cd2a70015c1e58bd1970f78831932
  */
 char* i1_traiter_entree_python(int fd_ipc) {
     static char buffer[BUF_SIZE];
@@ -69,4 +78,8 @@ char* i1_traiter_entree_python(int fd_ipc) {
     cJSON_Delete(json);
     
     return buffer;
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> b27404374e7cd2a70015c1e58bd1970f78831932
