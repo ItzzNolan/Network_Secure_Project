@@ -18,16 +18,20 @@ int main(int argc, char *argv[]){
     }else{
         printf("C'est pas ok \n");
     }*/
-   char chaine[] = "Le chien est bleu";
+   char chaine[] = "{\"type\" : \"REQUEST_PROP\", \"entity_id\" : n, \"x\" : x, \"y\" : y, \"id_send\" : id_Michel, \"id_recv\" : id_Jean}";
    //int len = strlen(str);
    char sep[] = " ";
    char *p = strtok(chaine, sep);
-   char tab[25];
+   char *tab[25];
+   int i = 0;
    while(p != NULL){
-        printf("%s \n", p);
+        tab[i] = p;
+        i = i+1;
         p= strtok(NULL,sep);
    }
-   printf("\n");
+   for(int j = 0; j<i; j++){
+    printf("%s \n", tab[j]);
+   }
 
 
 }
