@@ -46,6 +46,9 @@ class Jeu:
         self.ipc = IPCClient()  # initialisation du client IPC
         self.player_id = 0  # ou paramètre plus tard
         self.propriete = Propriete(self.player_id, self.ipc) 
+
+        # Debug
+        self.propriete.debug_force_local = True
     
     def get_ipc(self):
         return self.ipc
@@ -228,11 +231,53 @@ class Jeu:
                     "player_id": attacker.equipe
                 })
 
-    def _executer_action(self, action: Action):
+    def _executer_action_securisee(self, action: Action):
         unit = self.get_unit_by_id(action.unit_id)
+
         if unit is None or not unit.alive:
             return
-        
+
+        # J2 — vérification propriété
+        if self.propriete.suis_proprietaire(unit.id):
+            self._executer_action(action)
+            return
+
+        # demander propriété
+        etat = self.propriete.demander_propriete(unit.id)
+
+        if etat is None:
+            return  # abandon
+
+        # mise à jour locale (si réseau plus tard)
+        unit.coords = etat.get("coords", unit.coords)
+        unit.HP = etat.get("hp", unit.HP)
+
+        # recheck
+        if not unit.alive:
+            return
+
+        self._executer_action(action)
+
+    def _executer_action(self, action: Action):
+        unit = self.get_unit_by_id(action.unit_id)
+
+        if unit is None or not unit.alive:
+            return
+
+        # Gestion propriété
+        if not self.propriete.suis_proprietaire(unit.id):
+            etat = self.propriete.demander_propriete(unit.id)
+
+            if etat is None:
+                return
+
+            unit.coords = etat.get("coords", unit.coords)
+            unit.HP = etat.get("hp", unit.HP)
+
+            if not unit.alive:
+                return
+
+        # ACTIONS (INDÉPENDANT DE LA PROPRIÉTÉ)
         if action.type == TypeAction.MOVE:
             if action.target_pos:
                 self._executer_move(unit, action.target_pos)
@@ -242,7 +287,7 @@ class Jeu:
                 target = self.get_unit_by_id(action.target_id)
                 if target:
                     self._executer_attack(unit, target)
-        
+
         elif action.type == TypeAction.HOLD:
             pass
 
@@ -282,8 +327,10 @@ class Jeu:
 
         for action in move_actions:
             self._executer_action(action)
+            #self._executer_action_securisee(action)
         for action in attack_actions:
             self._executer_action(action)
+            # self._executer_action_securisee(action)
 
         self.unites = [u for u in self.unites if u.alive]
 
@@ -338,9 +385,18 @@ class Jeu:
                 y = unit_info.get("y")
                 self.ajouter_unite(nom_unite=unit_type, x=x, y=y, equipe=player_id)
             entities = [{"entity_id": u.id,"owner_id": u.equipe, "unit_type": u.unit_type, "x": u.coords[0], "y": u.coords[1],"hp": u.HP, "version": u.version} for u in self.unites if u.alive]
-            self.ipc.envoyer({"type": "FULL_STATE", "player_id": 0, "entities": entities})
+            # self.ipc.envoyer({"type": "FULL_STATE", "player_id": 0, "entities": entities})
+            self.ipc.envoyer({
+                "type": "FULL_STATE",
+                "player_id": 0,
+                "entities": entities,
+                "ownership": self.propriete.table
+            })
         elif type == "full_state":
             entities = message.get("entities", [])
+            # ajout V2 
+            ownership = message.get("ownership", {})
+            self.propriete.table = ownership
             for entity in entities:
                 unit_type = entity.get("unit_type")
                 equipe=entity.get("owner_id")
@@ -348,6 +404,7 @@ class Jeu:
                 y = entity.get("y")
                 hp = entity.get("hp")
                 version = entity.get("version")
+                entity_id = entity.get("entity_id") # au lieu de "id" pour éviter confusion avec player_id
                 unit = self.get_unit_by_id(entity_id)
                 if unit:
                     unit.coords = (x, y)
@@ -379,6 +436,14 @@ class Jeu:
                     unit.alive = False
                 self.unites[entity_id]=None
                 self.carte.retirer_unite(unit)
+                self.propriete.supprimer(entity_id) # ajout V2
+            # ajout V2
+            elif type == "request_prop":
+                entity_id = message.get("entity_id")
+                requester = message.get("player_id")
+                unit = self.get_unit_by_id(entity_id)
+                if unit:
+                    self.propriete.ceder_propriete(entity_id, requester, unit)
         elif type == "disconnect":
             if player_id in self.generaux:
                 del self.generaux[player_id]
@@ -389,6 +454,7 @@ class Jeu:
                         unit.alive = False
                         self.carte.retirer_unite(unit)
                         self.unites[unit.id]=None
+                        self.propriete.supprimer(unit.id) # ajout V2 
         else:
             print(f"[JEU] Unknown message type: {type}")
 
