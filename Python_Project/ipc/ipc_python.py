@@ -6,7 +6,13 @@ class IPCClient:
         self.addr_c = ("localhost", port_c)  
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) 
-        self.sock.bind(("localhost", port_python))  
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if hasattr(socket, "SO_REUSEPORT"):
+            try:
+                self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+            except OSError:
+                pass
+        self.sock.bind(("127.0.0.1", port_python)) 
         self.sock.setblocking(False) 
 
     def envoyer(self, msg: dict):

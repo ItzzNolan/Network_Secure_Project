@@ -12,6 +12,10 @@ import sys
 import os
 import importlib
 import json
+import socket
+import time
+import uuid
+from threading import Lock
 from threading import Thread
 
 
@@ -93,17 +97,20 @@ def cmd_run(args):
     from frontend.manager_vue import ManagerVue
     from backend.save_manager import SaveManager
     from backend.jeu import get_team_name,Jeu
+    from backend.carte import Carte
+    from ia.general import make_general
     
     global ipc, partie, running, paused, partie_terminee, game_tick,manager_vue, gagnant_label, gagnant_id, clock
     
     config = load_scenario_config(args.scenario)
     map_size = args.map_size 
     ais = args.ais if args.ais else []
+    lan_mode = not bool(ais)
 
     print(f"\n[SCENARIO] {args.scenario}: {config.get('description', '')}")
     print(f"[UNITES] {config['units']}")
     print(f"[MAP] {map_size}x{map_size}")
-    print(f"[IAs] {ais if ais else 'Aucune (ajout en jeu avec A)'}")
+    print(f"[IAs] {ais if ais else ('Aucune (LAN)' if lan_mode else 'Aucune (ajout en jeu avec A)')}")
 
     if ais:
         partie = initialiser(ais, config["units"], map_size=map_size)
@@ -131,14 +138,17 @@ def cmd_run(args):
     print(f"Scenario : {args.scenario}")
     print("Joueurs :")
     if not partie.generaux:
-        print("Aucun joueur (appuie sur A pour en ajouter)")
+        print("Aucun joueur (en attente LAN...)" if lan_mode else "Aucun joueur (appuie sur A pour en ajouter)")
     else:
         for pid,gen in partie.generaux.items():
             print(f"[{get_team_name(pid)}] Player {pid}: {gen.name}")
     print("-"*60)
     print("  CONTROLES:")
-    print("  P             = Pause/Play")
-    print("  A             = Ajouter une IA")
+    if lan_mode:
+        print("(LAN) Lancement auto à 2 joueurs")
+    else:
+        print("  P             = Pause/Play")
+        print("  A             = Ajouter une IA")
     print("  F9            = Changer vue (Pygame/Terminal)")
     print("  F10           = Plein ecran")
     print("  F11           = Quicksave")
@@ -147,6 +157,503 @@ def cmd_run(args):
     print("  R             = Recommencer")
     print("  ESC           = Quitter")
     print("="*60 + "\n")
+
+    if lan_mode:
+        LAN_PORT = 27105
+        BROADCAST_ADDR = "255.255.255.255"
+        DISCOVERY_TIMEOUT_SEC = 2.0
+        HOST_ANNOUNCE_INTERVAL_SEC = 0.5
+        STATE_SYNC_MIN_INTERVAL_SEC = 0.05
+
+        state_lock = Lock()
+
+        def get_local_ipv4():
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                s.connect(("1.1.1.1", 80))
+                return s.getsockname()[0]
+            except Exception:
+                return "127.0.0.1"
+            finally:
+                s.close()
+        
+        def send_udp(payload:dict, addr):
+            data = json.dumps(payload).encode("utf-8")
+            sock.sendto(data, addr)
+        
+        def build_state():
+            with state_lock:
+                return build_state_unlocked()
+            
+        def build_state_unlocked():
+            units_data = []
+            for unit in partie.unites:
+                if not getattr(unit, "alive", False) or not unit.coords:
+                    continue
+                x,y = unit.coords
+                units_data.append({
+                    "unit_type":unit.unit_type,
+                    "equipe":unit.equipe,
+                    "x":round(float(x),2),
+                    "y":round(float(y),2),
+                    "hp":int(getattr(unit, "HP", 0)),
+                })
+            
+            generaux_data = {str(pid):gen.name for pid,gen in partie.generaux.items()}
+
+            return {
+                "type": "STATE",
+                "scenario": args.scenario,
+                "map_size": map_size,
+                "tick": int(getattr(partie, "_tour", 0)),
+                "generaux": generaux_data,
+                "units": units_data,
+            }
+        
+        def apply_state(state):
+            with state_lock:
+                partie._tour = int(state.get("tick",0))
+                #reset map+state
+                partie.carte = Carte(largeur=map_size, hauteur=map_size)
+                partie.unites = []
+                partie.generaux = {}
+                generaux = state.get("generaux", {}) or {}
+                for pid, ia_name in generaux.items():
+                    try:
+                        pid = int(pid)
+                    except Exception:
+                        continue
+                    partie.generaux[pid] = make_general(ia_name, id_player=pid)
+                
+                if partie.generaux:
+                    partie.next_player_id = max(partie.generaux.keys()) + 1
+                else:
+                    partie.next_player_id = 0
+
+                for unit in state.get("units", []) or []:
+                    unit_type = unit.get("unit_type")
+                    equipe = int(unit.get("equipe",0))
+                    x = float(unit.get("x",0))
+                    y = float(unit.get("y",0))
+                    hp = int(unit.get("hp",0))
+
+                    ix = int(round(x))
+                    iy = int(round(y))
+
+                    if not partie.carte.est_dans_grille(ix, iy):
+                        continue
+
+                    partie.ajouter_unite(unit_type, ix, iy, equipe)
+                    created = partie.unites[-1] if partie.unites else None
+
+                    if created:
+                        created.coords = (x,y)
+                        created.HP = hp
+                        created.alive = True
+        
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.settimeout(0.2)
+        sock.bind(("", LAN_PORT))
+
+        device_id = uuid.uuid4().hex[:10]
+        local_ip = get_local_ipv4()
+
+        host_info = None
+        discover_payload = {
+            "type":"DISCOVER",
+            "device_id":device_id,
+            "scenario":args.scenario,
+            "map_size":map_size,
+        }
+
+        #broadcast
+        try:
+            sock.sendto(json.dumps(discover_payload).encode("utf-8"), (BROADCAST_ADDR, LAN_PORT))
+        except Exception:
+            pass
+
+        t = time.time()
+        while time.time() - t < DISCOVERY_TIMEOUT_SEC and host_info is None:
+            try:
+                data,addr = sock.recvfrom(65535)
+                msg = json.loads(data.decode("utf-8"))
+                if msg.get("type") == "HOST_ANNOUNCE":
+                    if msg.get("scenario") == args.scenario and int(msg.get("map_size", -1)) == map_size:
+                        host_info = {
+                            "host_device_id":msg.get("host_device_id"),
+                            "host_ip":msg.get("host_ip"),
+                        }
+                        break
+            except socket.timeout:
+                continue
+            except Exception:
+                continue
+        
+        is_host = host_info is None
+        cli_addrs = []
+        host_addr = None
+        host_device_id = None
+        host_ready = False
+        game_started = False
+        lan_msg = "Initialisation LAN..."
+
+        def host_announce_loop():
+            nonlocal host_device_id,lan_msg
+            host_device_id = device_id
+            while running:
+                payload = {
+                    "type": "HOST_ANNOUNCE",
+                    "host_device_id": host_device_id,
+                    "host_ip": local_ip,
+                    "scenario": args.scenario,
+                    "map_size": map_size,
+                }
+
+                try:
+                    sock.sendto(json.dumps(payload).encode("utf-8"), (BROADCAST_ADDR,LAN_PORT))
+                except Exception:
+                    pass
+
+                if host_ready and not game_started and not partie_terminee:
+                    lan_msg = "En attente d'un 2e joueur..."
+
+                time.sleep(HOST_ANNOUNCE_INTERVAL_SEC)
+        
+        #start host
+        if is_host:
+            thread_announce = Thread(target=host_announce_loop, daemon=True)
+            thread_announce.start()
+
+        pygame_init = True
+        host_ia_name = None
+
+        if is_host:
+            lan_msg = "Choix IA (Joueur 1)"
+            manager_vue.vue_pygame.paused = True
+            paused = True
+            host_ia_name = choisir_ia_pygame(manager_vue.vue_pygame.screen)
+            if not host_ia_name:
+                running = False
+                pygame.quit()
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+                return 
+            
+            partie.ajouter_joueur(host_ia_name,config["units"])
+            host_ready = True
+            lan_msg = "En attente d'un 2e joueur..."
+            manager_vue.vue_pygame.paused = True
+            paused = True
+        
+        else:
+            host_device_id = host_info.get("host_device_id")
+            host_ip = host_info.get("host_ip")
+            host_addr = (host_ip,LAN_PORT)
+            lan_msg = "Connexion en cours..."
+            manager_vue.vue_pygame.paused = True
+            paused = True
+
+            cli_ia_name = choisir_ia_pygame(manager_vue.vue_pygame.screen)
+            if not cli_ia_name:
+                running = False
+                pygame.quit()
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+                return
+            
+            join_payload = {
+                "type": "JOIN_REQ",
+                "device_id": device_id,
+                "scenario": args.scenario,
+                "map_size": map_size,
+                "ai": cli_ia_name,
+            }
+
+            try:
+                send_udp(join_payload,host_addr)
+            except Exception:
+                #host dispawn
+                pass
+            
+        def send_state_to_clients():
+            if not cli_addrs:
+                return
+            
+            payload = build_state()
+
+            for addr in cli_addrs:
+                try:
+                    sock.sendto(json.dumps(payload).encode("utf-8"),addr)
+                except Exception:
+                    pass
+
+        def send_game_over_to_clients(winner_pid):
+            payload = {
+                "type": "GAME_OVER",
+                "scenario": args.scenario,
+                "map_size": map_size,
+                "winner_pid": winner_pid,
+            }
+
+            for addr in cli_addrs:
+                try:
+                    sock.sendto(json.dumps(payload).encode("utf-8"),addr)
+                except Exception:
+                    pass
+
+        def lan_listener_loop():
+            global paused, partie_terminee, gagnant_label, gagnant_id
+            nonlocal game_started, cli_addrs, host_ready, host_addr, lan_msg
+            connected_cli_ips = set()
+
+            while running:
+                try:
+                    data,addr = sock.recvfrom(65535)
+                except socket.timeout:
+                    continue
+                except Exception:
+                    continue
+
+                try:
+                    msg = json.loads(data.decode("utf-8"))
+                except Exception:
+                    continue
+
+                m_type = (msg.get("type") or "").upper()
+
+                if is_host and m_type == "JOIN_REQ":
+                    if not host_ready or game_started:
+                        continue
+
+                    if msg.get("scenario") != args.scenario or int(msg.get("map_size",-1)) != map_size:
+                        continue
+
+                    cli_ip = addr[0]
+                    if cli_ip in connected_cli_ips:
+                        continue
+
+                    if len(partie.generaux)>=2:
+                        continue
+
+                    connected_cli_ips.add(cli_ip)
+                    cli_addrs.append(addr)
+
+                    cli_ia_name = msg.get("ai")
+                    if not cli_ia_name:
+                        continue
+
+                    with state_lock:
+                        partie.ajouter_joueur(str(cli_ia_name),config["units"])
+
+                    #combat started
+                    game_started = True
+                    paused = False
+                    manager_vue.vue_pygame.paused = False
+                    lan_msg = ""
+
+                    try:
+                        sock.sendto(json.dumps(build_state()).encode("utf-8"),addr)
+                    except Exception:
+                        pass
+
+                if not is_host and m_type == "STATE":
+                    if msg.get("scenario") != args.scenario or int(msg.get("map_size",-1)) != map_size:
+                        continue
+                    if not game_started:
+                        game_started = True
+                        paused = False
+                        manager_vue.vue_pygame.paused = False
+                        lan_msg = ""
+                    
+                    apply_state(msg)
+                
+                if not is_host and m_type == "GAME_OVER":
+                    winner_pid = int(msg.get("winner_pid",-1))
+                    partie_terminee = True
+                    paused = True
+                    manager_vue.vue_pygame.paused = True
+                    gagnant_id = winner_pid
+                    
+                    if winner_pid == -1:
+                        gagnant_label = "EGALITE"
+
+                    else:
+                        gen_name = partie.generaux[winner_pid].name if winner_pid in partie.generaux else "?"
+                        gagnant_label = f"{get_team_name(winner_pid)} ({gen_name})"
+                    
+                    lan_msg = "Combat termine!"
+
+        thread_lan = Thread(target=lan_listener_loop, daemon=True)
+        thread_lan.start()
+
+        last_state_sent = 0.0
+
+        def tour_jeu_lan():
+            nonlocal last_state_sent, game_started
+            global running, paused, partie_terminee, game_tick, partie, clock, gagnant_label, gagnant_id
+
+            while running:
+                if is_host and (not paused) and (not partie_terminee) and game_started:
+                    game_tick+=1
+                    if game_tick>=10:
+                        game_tick=0
+                        with state_lock:
+                            partie.mettre_a_jour()
+
+                        result = partie.check_victory()
+                        if result is not None:
+                            partie_terminee = True
+                            paused = True
+                            manager_vue.vue_pygame.paused = True
+                            gagnant_id = result
+                            if result==-1:
+                                gagnant_label = "EGALITE"
+                            else:
+                                gen_name = partie.generaux[result].name if result in partie.generaux else "?"
+                                gagnant_label = f"{get_team_name(result)} ({gen_name})"
+                            send_game_over_to_clients(result)
+
+                        now = time.time()
+                        if now - last_state_sent>=STATE_SYNC_MIN_INTERVAL_SEC:
+                            last_state_sent = now
+                            payload = build_state_unlocked()
+
+                            for addr in cli_addrs:
+                                try:
+                                    sock.sendto(json.dumps(payload).encode("utf-8"), addr)
+                                except Exception:
+                                    pass
+
+                time.sleep(1/60)
+
+        thread_sim = Thread(target=tour_jeu_lan, daemon=True) #hostonly
+        thread_sim.start()
+
+        def draw_lan_overlay():
+            if manager_vue.mode_actuel != "PYGAME":
+                return
+            if game_started and not partie_terminee:
+                #pas dark screen
+                return
+            if not lan_msg:
+                return
+            screen = manager_vue.vue_pygame.screen
+            w,h = screen.get_size()
+            overlay = pygame.Surface((w,h), pygame.SRCALPHA)
+            overlay.fill((0,0,0,160))
+            screen.blit(overlay, (0,0))
+
+            font_big = pygame.font.SysFont("Segoe UI", 38, bold=True)
+            font_sub = pygame.font.SysFont("Segoe UI", 20)
+            box_w,box_h = 600,150
+            box_x = (w-box_w) // 2
+            box_y = (h-box_h) // 2
+
+            pygame.draw.rect(screen, (20, 20, 30), (box_x, box_y, box_w, box_h))
+            pygame.draw.rect(screen, (255,255,255), (box_x, box_y, box_w, box_h), 3)
+            title = font_big.render(lan_msg, True, (255, 255, 255))
+            sub = font_sub.render("Le combat démarrera à partir de 2 joueurs...", True, (200, 200, 200))
+            screen.blit(title, (w // 2-title.get_width() // 2, h // 2-40))
+            screen.blit(sub, (w // 2-sub.get_width() // 2, h // 2+10))
+
+        thread2 = Thread(target=reception_message, daemon=True) if 'reception_message' in locals() else None
+
+        def reception_message_lan():
+            global ipc, running, partie
+            liste_message = []
+
+            while running:
+                try:
+                    liste_message = ipc.recevoir()
+                except Exception:
+                    liste_message = []
+
+                if len(liste_message) > 0:
+                    for msg in liste_message:
+                        print(f"[IPC] Message recu: {msg}")
+                        partie.appliquer_message(msg)
+
+                liste_message = []
+
+        thread_ipc = Thread(target=reception_message_lan, daemon=True)
+        thread_ipc.start()
+
+        def pygame_loop_lan():
+            global manager_vue, partie_terminee, paused, partie, gagnant_label, gagnant_id, running, clock, game_tick
+            
+            while running:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        running = False
+
+                    if event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_ESCAPE:
+                            running = False
+
+                        elif event.key == pygame.K_F9:
+                            manager_vue.changer_mode()
+
+                        elif event.key == pygame.K_F10:
+                            manager_vue.vue_pygame.fullscreen = not manager_vue.vue_pygame.fullscreen
+                            if manager_vue.vue_pygame.fullscreen:
+                                manager_vue.vue_pygame.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                            else:
+                                manager_vue.vue_pygame.screen = pygame.display.set_mode(
+                                    (manager_vue.vue_pygame.SCREEN_WIDTH, manager_vue.vue_pygame.SCREEN_HEIGHT))
+
+                        elif event.key == pygame.K_F11:
+                            save_manager.sauvegarder(partie)
+
+                        elif event.key == pygame.K_F12:
+                            if save_manager.charger(partie):
+                                partie_terminee = False
+                                gagnant_id = None
+                                gagnant_label = None
+
+                        elif event.key == pygame.K_TAB:
+                            paused = True
+                            manager_vue.vue_pygame.paused = True
+                            save_manager.ouvrir_stats_html(partie)
+
+                        elif event.key == pygame.K_r:
+                            #Reset local ne work pas e LAN
+                            manager_vue.jeu = partie
+                            partie_terminee = False
+                            gagnant_id = None
+                            gagnant_label = None
+                            paused = True
+                            manager_vue.vue_pygame.paused = True
+
+                keys = pygame.key.get_pressed()
+                shift = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
+
+                if manager_vue.mode_actuel == "PYGAME":
+                    manager_vue.vue_pygame.gerer_camera(keys)
+                else:
+                    manager_vue.vue_terminal.gerer_touches(keys, shift)
+
+                with state_lock:
+                    manager_vue.afficher(partie_terminee=partie_terminee, gagnant=gagnant_label, gagnant_id=gagnant_id)
+                
+                draw_lan_overlay()
+                pygame.display.flip()
+                clock.tick(60)
+
+        try:
+            pygame_loop_lan()
+        finally:
+            try:
+                sock.close()
+            except Exception:
+                pass
+            pygame.quit()
+        return
 
     def tour_jeu():
         global running, paused, partie_terminee, game_tick, partie, clock
