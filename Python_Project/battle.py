@@ -110,6 +110,12 @@ def cmd_run(args):
     else:
         partie = Jeu(largeur=map_size, hauteur=map_size)
     
+    if hasattr(args, 'network') and args.network:
+        partie.player_id = args.player_id if hasattr(args, 'player_id') else 1
+        
+        print(f"[RESEAU] Mode réseau activé, joueur {partie.player_id}")
+        partie.envoyer_join()
+
     ipc = partie.get_ipc()
 
     manager_vue = ManagerVue(partie)
@@ -276,6 +282,10 @@ def cmd_run(args):
     thread2.start()
     
     pygame_loop()  # Utilisation du thread principal pour éviter les problèmes de Pygame
+
+    if hasattr(partie, 'ipc') and partie.ipc:
+        partie.disconnect()
+
 
     pygame.quit()
 
