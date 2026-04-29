@@ -5,8 +5,10 @@ class Propriete:
         self.table = {}  # {entity_id: owner_id}
 
     def suis_proprietaire(self, entity_id):
+        if hasattr(self, "debug_force_local") and self.debug_force_local:
+            return True
         return self.table.get(entity_id) == self.player_id
-    
+
     def demander_propriete(self, entity_id):
         self.ipc.envoyer({
             "type": "REQUEST_PROP",
