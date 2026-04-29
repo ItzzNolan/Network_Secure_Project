@@ -67,23 +67,29 @@ int main(int argc, char *argv[]){
     char answer[] ="ANSWER_PROP";
     char message[] = "{\"type\" : \"ANSWER_PROP\", \"entity_id\" : n, \"x\" : x, \"y\" : y, \"id_send\" : id_Michel, \"id_recv\" : id_Jean}" ;
     char myid[] = "id_Jean";
+
+    char messagecpy[strlen(message)];
+    strcpy(messagecpy,message);
+
+    printf("%s \n", messagecpy);
     
     int count = 0;
     char *tab[25];
+
+    separer(messagecpy, tab, &count);
 
 
     if (strstr(message,request)){
         printf("requête");
        
-        separer(message, tab, &count);
+        
         if (findidsend(tab,myid,count)==0){
             printf("envoi requête \n");
         }
     }
-    else if (strstr(message,answer)){
+    else if (strstr(message,"ANSWER_PROP")){
         
 
-        separer(message, tab, &count);
         if (findidrcv(tab,myid,count)==0){
             printf("envoi réponse \n");
         }
