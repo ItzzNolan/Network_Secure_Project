@@ -316,9 +316,6 @@ def cmd_run(args):
                 except Exception:
                     pass
 
-                if host_ready and not game_started and not partie_terminee:
-                    lan_msg = "En attente d'un 2e joueur..."
-
                 time.sleep(HOST_ANNOUNCE_INTERVAL_SEC)
         
         #start host
@@ -345,9 +342,11 @@ def cmd_run(args):
             
             partie.ajouter_joueur(host_ia_name,config["units"])
             host_ready = True
-            lan_msg = "En attente d'un 2e joueur..."
-            manager_vue.vue_pygame.paused = True
-            paused = True
+
+            game_started = True
+            paused = False
+            manager_vue.vue_pygame.paused = False
+            lan_msg = ""
         
         else:
             host_device_id = host_info.get("host_device_id")
@@ -428,7 +427,7 @@ def cmd_run(args):
                 m_type = (msg.get("type") or "").upper()
 
                 if is_host and m_type == "JOIN_REQ":
-                    if not host_ready or game_started:
+                    if not host_ready:
                         continue
 
                     if msg.get("scenario") != args.scenario or int(msg.get("map_size",-1)) != map_size:
@@ -450,12 +449,6 @@ def cmd_run(args):
 
                     with state_lock:
                         partie.ajouter_joueur(str(cli_ia_name),config["units"])
-
-                    #combat started
-                    game_started = True
-                    paused = False
-                    manager_vue.vue_pygame.paused = False
-                    lan_msg = ""
 
                     try:
                         sock.sendto(json.dumps(build_state()).encode("utf-8"),addr)
