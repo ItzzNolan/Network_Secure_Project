@@ -35,7 +35,7 @@ int udp_send(const void* data){
    
    serv_addr.sin_family = AF_INET;
    serv_addr.sin_port=htons(PORT);
-   inet_aton("255.255.255.255", &serv_addr.sin_addr);
+   inet_aton("172.20.10.3", &serv_addr.sin_addr);
 
    if (sendto(sockfd, data, len, 0, (struct sockaddr*)&serv_addr,len)<0){
       stop("sendto");
