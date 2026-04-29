@@ -42,6 +42,8 @@ class Jeu:
         self._tour = 0
         self.generaux: Dict[int, General] = {}
         self.next_player_id = 0
+        self.domination_team = None
+        self.waiting_for_player = False
 
         self.ipc = IPCClient()  # initialisation du client IPC
         self.player_id = 0  # ou paramètre plus tard
@@ -61,6 +63,9 @@ class Jeu:
 
         #Spawn units
         self._spawn_units_for_player(pid, units_config)
+
+        self.waiting_for_player = False
+        self.domination_team = None
 
         return pid
     
@@ -304,12 +309,16 @@ class Jeu:
 
         alive_teams = [t for t,c in alive_by_team.items() if c>0]
 
-        if len(alive_teams)==0:
+        if len(alive_teams) == 0:
             return -1
 
-        if len(alive_teams)==1:
-            return alive_teams[0]
+        if len(alive_teams) == 1:
+            self.domination_team = alive_teams[0]
+            self.waiting_for_player = True
+            return None
 
+        self.domination_team = None
+        self.waiting_for_player = False
         return None
 
     def trouver_ennemi_proche(self, unite):

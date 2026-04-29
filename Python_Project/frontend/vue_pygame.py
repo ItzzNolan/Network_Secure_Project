@@ -4,6 +4,7 @@ import os
 from frontend.iso import grid_to_iso
 from assets.loader import load_sprite
 from backend.jeu import get_team_color, get_team_name, TEAM_COLORS
+import math
 
 
 class VuePygame:
@@ -141,8 +142,46 @@ class VuePygame:
         self._dessiner_minimap(jeu, current_w, current_h)
         self._dessiner_equipes(jeu, current_w, current_h)
         self._dessiner_hud(jeu, current_w)
+        if hasattr(jeu, "waiting_for_player") and jeu.waiting_for_player:
+            self._dessiner_message_attente(jeu)
         if partie_terminee:
             self._dessiner_victoire(jeu, current_w, current_h, gagnant, gagnant_id)
+    
+    def _dessiner_message_attente(self, jeu):
+        current_w, current_h = self.screen.get_size()
+        overlay = pygame.Surface((current_w, current_h), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))
+        self.screen.blit(overlay, (0, 0))
+
+        time_ms = pygame.time.get_ticks()
+        pulse = (math.sin(time_ms*0.005) + 1)/2
+
+        if jeu.domination_team is not None:
+            base_color = get_team_color(jeu.domination_team)
+            color = (min(255, int(base_color[0] + pulse * 80)),min(255, int(base_color[1] + pulse * 80)),min(255, int(base_color[2] + pulse * 80)),)
+            color_name = get_team_name(jeu.domination_team)
+            name = jeu.domination_team
+            text_main = f"DOMINATION TEAM {name} - {color_name}"
+        else:
+            color = (200, 200, 200)
+            text_main = "DOMINATION"
+
+        text_sub = "En attente d'un autre joueur..."
+        font_main = pygame.font.SysFont("Segoe UI", 38, bold=True)
+        font_sub  = pygame.font.SysFont("Segoe UI", 18)
+        box_w, box_h = 600, 160
+        box_x = (current_w - box_w) // 2
+        box_y = (current_h - box_h) // 2
+
+        pygame.draw.rect(self.screen, (20, 20, 30), (box_x, box_y, box_w, box_h))
+        pygame.draw.rect(self.screen, color, (box_x, box_y, box_w, box_h), 3)
+
+        scale = 1 + pulse * 0.05
+        txt_main = font_main.render(text_main, True, color)
+        txt_main = pygame.transform.smoothscale(txt_main,(int(txt_main.get_width() * scale), int(txt_main.get_height() * scale)))
+        self.screen.blit(txt_main, (current_w // 2 - txt_main.get_width() // 2,box_y+30))
+        txt_sub = font_sub.render(text_sub, True, (150, 150, 150))
+        self.screen.blit(txt_sub, (current_w // 2 - txt_sub.get_width() // 2,box_y+95))
 
     def _dessiner_unites(self, jeu):
         for u in jeu.unites:
@@ -208,15 +247,33 @@ class VuePygame:
             self._dessiner_boite_equipe(jeu, pid, x, y, box_w, box_h)
 
     def _dessiner_boite_equipe(self, jeu, pid, x, y, box_w, box_h):
+        alive_units = [u for u in jeu.unites if u.alive and u.equipe == pid]
+        count = len(alive_units)
+        is_alive = count > 0
         color = get_team_color(pid)
         name = get_team_name(pid)
         gen_name = jeu.generaux[pid].name if pid in jeu.generaux else "?"
         count = len([u for u in jeu.unites if u.alive and u.equipe == pid])
 
-        bg_color = tuple(max(0, c // 5) for c in color)
-        pygame.draw.rect(self.screen, bg_color, (x, y, box_w, box_h))
-        pygame.draw.rect(self.screen, color, (x, y, box_w, box_h), 2)
-        pygame.draw.rect(self.screen, color, (x, y, box_w, 18))
+        if is_alive:
+            bg_color = tuple(max(0, c // 5) for c in color)
+            border_color = color
+            text_color = color
+            alpha = 255
+        else:
+            bg_color = (30, 30, 30)
+            border_color = (80, 80, 80)
+            text_color = (100, 100, 100)
+            alpha = 120
+        
+        box_surface = pygame.Surface((box_w, box_h), pygame.SRCALPHA)
+        box_surface.set_alpha(alpha)
+
+        pygame.draw.rect(box_surface, bg_color, (0, 0, box_w, box_h))
+        pygame.draw.rect(box_surface, color, (0, 0, box_w, box_h), 2)
+        pygame.draw.rect(box_surface, color, (0, 0, box_w, 18))
+
+        self.screen.blit(box_surface, (x, y))   
 
         title_surf = self.font_mono.render(f"EQ {pid} - {name}", True, (255, 255, 255))
         self.screen.blit(title_surf, (x + 5, y + 1))
