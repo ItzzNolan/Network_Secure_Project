@@ -29,9 +29,16 @@ int main(int argc, char *argv[]){
         i = i+1;
         p= strtok(NULL,sep);
    }
+   char idsend[] = "id_send";
+
    for(int j = 0; j<i; j++){
-    printf("%s \n", tab[j]);
+    if(strstr(tab[j], idsend)){
+        printf("%s \n", tab[j+2]);
+    }
    }
+
+
+
 
 
 }
