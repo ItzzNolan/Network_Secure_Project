@@ -10,6 +10,8 @@ def build_parser():
     run_parser.add_argument("-t", action="store_true")
     run_parser.add_argument("-d", type=str, default=None, metavar="DATAFILE")
     run_parser.add_argument("-m", "--map-size", type=int, default=30, metavar="SIZE", help="Taille de la carte NxN (defaut: 30)")
+    run_parser.add_argument('--network', action='store_true', help='Mode réseau')
+    run_parser.add_argument('--player-id', type=int, default=1, help='ID du joueur')
 
     load_parser = subparsers.add_parser("load")
     load_parser.add_argument("savefile", type=str)
