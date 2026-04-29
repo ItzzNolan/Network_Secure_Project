@@ -30,10 +30,17 @@ int main(int argc, char *argv[]){
         p= strtok(NULL,sep);
    }
    char idsend[] = "id_send";
-
+   
    for(int j = 0; j<i; j++){
     if(strstr(tab[j], idsend)){
         printf("%s \n", tab[j+2]);
+
+        int idlen = strlen(tab[j+2]);
+        char idfind[idlen];
+        strcpy(idfind, tab[j+2]);
+        
+        idfind[idlen -1] = '\0';
+        printf("%s \n", idfind);
     }
    }
 
