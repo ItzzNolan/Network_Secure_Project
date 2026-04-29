@@ -8,7 +8,8 @@
 
 // --- CONSTANTES ---
 #define PORT_C_ECOUTE_PY 9999  // Port où le coordinateur écoute Python
-#define PORT_PY_LOCAL    9998  // Port où l'IA Python écoute les mises à jour
+#define PORT_PY_J1       9998  // Port Python joueur 1
+#define PORT_PY_J2       9997  // Port Python joueur 2
 #define PORT_RESEAU_R1   12345 // Port de diffusion réseau (Broadcast)
 
 // --- FONCTIONS ---

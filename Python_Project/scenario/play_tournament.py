@@ -14,10 +14,15 @@ def end_fight(generaux: list, list_unite: dict, swap_positions=False, map_size=3
 
 
 def initialiser(generaux: list, list_unite: dict, swap_positions=False, map_size=30):
+    partie = Jeu(largeur=map_size, hauteur=map_size)
+
+    # Enregistrer les generaux via ajouter_joueur
     if len(generaux) == 1:
-        partie = Jeu(generaux[0], generaux[0], largeur=map_size, hauteur=map_size)
+        partie.ajouter_joueur(generaux[0], {})
+        partie.ajouter_joueur(generaux[0], {})
     else:
-        partie = Jeu(generaux[0], generaux[1], largeur=map_size, hauteur=map_size)
+        for g in generaux:
+            partie.ajouter_joueur(g, {})
 
     liste = []
     for k, v in list_unite.items():
@@ -32,26 +37,26 @@ def initialiser(generaux: list, list_unite: dict, swap_positions=False, map_size
     equipe_gauche = 1 if swap_positions else 0
     equipe_droite = 0 if swap_positions else 1
 
-    occupied:set = set()
+    occupied: set = set()
 
     def pick_random_pos(x_min: int, x_max: int) -> tuple:
         """Tire une case libre au hasard dans la zone [x_min, x_max] x [0, h-1]."""
-        t=0
-        while t<10_000:
+        t = 0
+        while t < 10_000:
             x = random.randint(x_min, x_max)
-            y = random.randint(0, h-1)
+            y = random.randint(0, h - 1)
             if (x, y) not in occupied:
                 return (x, y)
             t += 1
 
     for type_unite in liste:
         #Equipe gauche
-        pos_g = pick_random_pos(0, mid-1)
+        pos_g = pick_random_pos(0, mid - 1)
         occupied.add(pos_g)
         partie.ajouter_unite(type_unite, pos_g[0], pos_g[1], equipe_gauche)
 
         #Equipe droite (symetrique en x)
-        pos_d = pick_random_pos(mid, w-1)
+        pos_d = pick_random_pos(mid, w - 1)
         occupied.add(pos_d)
         partie.ajouter_unite(type_unite, pos_d[0], pos_d[1], equipe_droite)
 

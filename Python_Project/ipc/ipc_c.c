@@ -7,7 +7,8 @@
 #include "ipc_c.h"
 
 
-#define PORT_PY_LOCAL 9998
+#define PORT_PY_J1 9998
+#define PORT_PY_J2 9997
 #define PORT_RESEAU 12345
 #define BUF_SIZE 2048
 
@@ -31,9 +32,15 @@ int i1_envoyer_message(const char *data, int vers_reseau) {
         dest_addr.sin_port = htons(PORT_RESEAU);
         inet_aton("255.255.255.255", &dest_addr.sin_addr);
     } else {
-        // Mode Local (vers Python)
-        dest_addr.sin_port = htons(PORT_PY_LOCAL);
+        // Mode Local : envoyer vers les 2 joueurs Python
+        int ports[] = {PORT_PY_J1, PORT_PY_J2};
         inet_aton("127.0.0.1", &dest_addr.sin_addr);
+        for (int i = 0; i < 2; i++) {
+            dest_addr.sin_port = htons(ports[i]);
+            sendto(sockfd, data, strlen(data), 0, (struct sockaddr*)&dest_addr, sizeof(dest_addr));
+        }
+        close(sockfd);
+        return 0;
     }
 
     int res = sendto(sockfd, data, strlen(data), 0, (struct sockaddr*)&dest_addr, sizeof(dest_addr));
