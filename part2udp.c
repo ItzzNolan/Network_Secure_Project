@@ -49,7 +49,7 @@ int findidrcv(char *message[], char myid[], int i){
 int main(int argc, char *argv[]){
     char request[] = "REQUEST_PROP";
     char answer[] ="ANSWER_PROP";
-    char message[]= ;
+    char message[] = "{\"type\" : \"REQUEST_PROP\", \"entity_id\" : n, \"x\" : x, \"y\" : y, \"id_send\" : id_Michel, \"id_recv\" : id_Jean}" ;
 
 
 
