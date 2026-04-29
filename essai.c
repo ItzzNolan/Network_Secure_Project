@@ -2,10 +2,11 @@
 #include <stdio.h>
 #include <string.h>
 
-int findidsend(char message[], char myid[], int i){
+int findidsend(char *message[], char myid[], int i){
     
     char idsend[] = "id_send";
     for(int j = 0; j<i; j++){
+        printf("%s \n", message[j]);
         if(strstr(message[j], idsend)){
             printf("%s \n", message[j+2]);
 
@@ -16,10 +17,9 @@ int findidsend(char message[], char myid[], int i){
             idfind[idlen -1] = '\0';
             printf("%s \n", idfind);
             return strcmp(myid,idfind);
-        }else{
-            return 0;
         }
-   }
+    }
+    return 4;
 
 }
 
@@ -64,8 +64,10 @@ int main(int argc, char *argv[]){
         printf("%s \n", idfind);
     }
    }*/
-
-   printf("%d \n", findidsend(tab,"id_michel",i));
+   printf("%d \n", i);
+   printf("%d \n", findidsend(tab,"id_Michel",i));
+   printf("%d \n", findidsend(tab,"id_Jean",i));
+   
 
 
 
