@@ -1,39 +1,15 @@
 import argparse
-
 def build_parser():
-    parser = argparse.ArgumentParser(prog="battle", description="MedievAIl BAIttle GenerAIl")
+    parser = argparse.ArgumentParser(prog="battle")
     subparsers = parser.add_subparsers(dest="command", required=True)
-    
-    run_parser = subparsers.add_parser("run")
-    run_parser.add_argument("scenario", type=str)
-    run_parser.add_argument("ais", nargs="*", default=None, metavar="AI", help="Noms des IAs participantes (autant que voulu)")
-    run_parser.add_argument("-t", action="store_true")
-    run_parser.add_argument("-d", type=str, default=None, metavar="DATAFILE")
-    run_parser.add_argument("-m", "--map-size", type=int, default=30, metavar="SIZE", help="Taille de la carte NxN (defaut: 30)")
-    
-    # === NOUVEAUX ARGUMENTS RÉSEAU ===
-    run_parser.add_argument("--network", action="store_true", help="Active le mode réseau / IPC")
-    run_parser.add_argument("--player-id", type=int, default=0, help="ID du joueur local sur le réseau")
-    run_parser.add_argument("--py-port", type=int, default=9998, help="Port Python local pour IPC (9998 pour J0, 9997 pour J1)")
-
-    load_parser = subparsers.add_parser("load")
-    load_parser.add_argument("savefile", type=str)
-
-    tourney_parser = subparsers.add_parser("tourney")
-    tourney_parser.add_argument("-G", nargs="+", default=None, metavar="AI")
-    tourney_parser.add_argument("-S", nargs="+", default=None, metavar="SCENARIO")
-    tourney_parser.add_argument("-N", type=int, default=10)
-    tourney_parser.add_argument("-na", action="store_true")
-    tourney_parser.add_argument("-m", "--map-size", type=int, default=30, metavar="SIZE", help="Taille de la carte NxN (defaut: 30)")
-
-    plot_parser = subparsers.add_parser("plot")
-    plot_parser.add_argument("ai", type=str)
-    plot_parser.add_argument("plotter", type=str)
-    plot_parser.add_argument("scenario_call", type=str)
-    plot_parser.add_argument("range_arg", type=str)
-    plot_parser.add_argument("-N", type=int, default=10)
-    
+    run_p = subparsers.add_parser("run")
+    run_p.add_argument("scenario", type=str)
+    run_p.add_argument("ais", nargs="*", default=None)
+    run_p.add_argument("-t", action="store_true")
+    run_p.add_argument("-d", type=str, default=None)
+    run_p.add_argument("-m", "--map-size", type=int, default=30)
+    run_p.add_argument("--network", action="store_true")
+    run_p.add_argument("--player-id", type=int, default=0)
     return parser
-
 def parse_args(args=None):
     return build_parser().parse_args(args)
