@@ -29,8 +29,7 @@ class Propriete:
     
     def ceder_propriete(self, entity_id, demandeur_id, unit):
         state = {
-            "x": unit.coords[0],
-            "y": unit.coords[1],
+            "coords": unit.coords,
             "hp": unit.HP
         }
 
@@ -49,5 +48,8 @@ class Propriete:
             "entity_id": entity_id,
             "reason": raison
         })
+
+    def supprimer(self, entity_id):
+        self.table.pop(entity_id, None)
 
     

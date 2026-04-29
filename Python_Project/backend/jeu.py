@@ -46,6 +46,7 @@ class Jeu:
         self.ipc = IPCClient()  # initialisation du client IPC
         self.player_id = 0  # ou paramètre plus tard
         self.propriete = Propriete(self.player_id, self.ipc) 
+        self.units_locked = set()  # pour suivre les unités en cours de traitement  
 
         # Debug
         self.propriete.debug_force_local = True
@@ -256,26 +257,17 @@ class Jeu:
         if not unit.alive:
             return
 
-        self._executer_action(action)
+        self.units_locked.add(unit.id)
+        try:
+            self._executer_action(action)
+        finally:
+            self.units_locked.remove(unit.id)
 
     def _executer_action(self, action: Action):
         unit = self.get_unit_by_id(action.unit_id)
 
         if unit is None or not unit.alive:
             return
-
-        # Gestion propriété
-        if not self.propriete.suis_proprietaire(unit.id):
-            etat = self.propriete.demander_propriete(unit.id)
-
-            if etat is None:
-                return
-
-            unit.coords = etat.get("coords", unit.coords)
-            unit.HP = etat.get("hp", unit.HP)
-
-            if not unit.alive:
-                return
 
         # ACTIONS (INDÉPENDANT DE LA PROPRIÉTÉ)
         if action.type == TypeAction.MOVE:
@@ -326,11 +318,11 @@ class Jeu:
         random.shuffle(attack_actions)
 
         for action in move_actions:
-            self._executer_action(action)
-            #self._executer_action_securisee(action)
+            # self._executer_action(action)
+            self._executer_action_securisee(action)
         for action in attack_actions:
-            self._executer_action(action)
-            # self._executer_action_securisee(action)
+            # self._executer_action(action)
+            self._executer_action_securisee(action)
 
         self.unites = [u for u in self.unites if u.alive]
 
@@ -371,7 +363,9 @@ class Jeu:
     
     def appliquer_message(self, message: Dict):
         type = message.get("type").lower()
-        player_id = int(message.get("player_id"))
+        player_id = message.get("player_id")
+        if player_id is not None:
+            player_id = int(player_id)
         if type == "join":
             player_name = message.get("player_name", "Unknown")
             units = message.get("units", [])
@@ -390,7 +384,7 @@ class Jeu:
                 "type": "FULL_STATE",
                 "player_id": 0,
                 "entities": entities,
-                "ownership": self.propriete.table
+                "ownership": dict(self.propriete.table)
             })
         elif type == "full_state":
             entities = message.get("entities", [])
@@ -436,27 +430,31 @@ class Jeu:
                     unit.alive = False
                 self.unites[entity_id]=None
                 self.carte.retirer_unite(unit)
+                print("TABLE AVANT:", self.propriete.table)
                 self.propriete.supprimer(entity_id) # ajout V2
-            # ajout V2
-            elif type == "request_prop":
-                entity_id = message.get("entity_id")
-                requester = message.get("player_id")
-                unit = self.get_unit_by_id(entity_id)
-                if unit:
+                print("TABLE APRES:", self.propriete.table)
+        # ajout V2
+        elif type == "request_prop":
+            entity_id = message.get("entity_id")
+            requester = message.get("requester_id")
+            unit = self.get_unit_by_id(entity_id)
+            if unit:
+                if entity_id in self.units_locked:
+                    self.propriete.refuser_propriete(entity_id, requester, "busy")
+                else:
                     self.propriete.ceder_propriete(entity_id, requester, unit)
         elif type == "disconnect":
             if player_id in self.generaux:
                 del self.generaux[player_id]
                 print(f"[JEU] Player ID {player_id} left")
+
                 for unit in self.unites:
                     if unit and unit.equipe == player_id:
                         unit.HP = 0
                         unit.alive = False
                         self.carte.retirer_unite(unit)
-                        self.unites[unit.id]=None
+                        self.unites[unit.id] = None
                         self.propriete.supprimer(unit.id) # ajout V2 
-        else:
-            print(f"[JEU] Unknown message type: {type}")
 
     # DISCONNECT
     def disconnect(self):
