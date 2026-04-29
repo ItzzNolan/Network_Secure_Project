@@ -2,6 +2,22 @@
 #include <stdio.h>
 #include <string.h>
 
+
+void separer(char *message, char *tab[], int *count) {
+    char separateur[] = " ";
+    char *p = strtok(message, separateur);
+    int i = 0;
+
+    while (p != NULL) {
+        tab[i++] = p;
+        p = strtok(NULL, separateur);
+    }
+
+    *count = i;
+}
+
+
+
 int findidsend(char *message[], char myid[], int i){
     
     char idsend[] = "id_send";
@@ -49,16 +65,30 @@ int findidrcv(char *message[], char myid[], int i){
 int main(int argc, char *argv[]){
     char request[] = "REQUEST_PROP";
     char answer[] ="ANSWER_PROP";
-    char message[] = "{\"type\" : \"REQUEST_PROP\", \"entity_id\" : n, \"x\" : x, \"y\" : y, \"id_send\" : id_Michel, \"id_recv\" : id_Jean}" ;
+    char message[] = "{\"type\" : \"ANSWER_PROP\", \"entity_id\" : n, \"x\" : x, \"y\" : y, \"id_send\" : id_Michel, \"id_recv\" : id_Jean}" ;
+    char myid[] = "id_Jean";
+    
+    int count = 0;
+    char *tab[25];
 
 
-
-    if(strstr(message, request)){
-        printf("C'est ok \n");
-    }else if(strstr(message, answer)){
-        printf("C'est pas ok \n");
-    }else{
-        NULL;
+    if (strstr(message,request)){
+        printf("requête");
+       
+        separer(message, tab, &count);
+        if (findidsend(tab,myid,count)==0){
+            printf("envoi requête \n");
+        }
     }
+    else if (strstr(message,answer)){
+        
 
+        separer(message, tab, &count);
+        if (findidrcv(tab,myid,count)==0){
+            printf("envoi réponse \n");
+        }
+    }
+    else printf("autre message \n");
+    
+    return 0;
 }
