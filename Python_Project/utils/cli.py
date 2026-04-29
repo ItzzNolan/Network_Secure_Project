@@ -14,6 +14,7 @@ def build_parser():
     # === NOUVEAUX ARGUMENTS RÉSEAU ===
     run_parser.add_argument("--network", action="store_true", help="Active le mode réseau / IPC")
     run_parser.add_argument("--player-id", type=int, default=0, help="ID du joueur local sur le réseau")
+    run_parser.add_argument("--py-port", type=int, default=9998, help="Port Python local pour IPC (9998 pour J0, 9997 pour J1)")
 
     load_parser = subparsers.add_parser("load")
     load_parser.add_argument("savefile", type=str)
