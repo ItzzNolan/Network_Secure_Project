@@ -3,8 +3,10 @@ import json
 import time
 
 
+PORT_PY_PAR_JOUEUR = {0: 9998, 1: 9997}
+
 class IPCClient:
-    def __init__(self, port_c=9999, port_python=9998):
+    def __init__(self, port_c=9999, port_python=9998, player_id=0):
         self.addr_c = ("localhost", port_c)
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
