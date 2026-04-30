@@ -60,14 +60,14 @@ void i1_router_message_python(char *raw_json) {
     }
 
 
-    // 1. CAS BROADCAST : UPDATE, JOIN, DISCONNECT
+    // 1. Cas Broadcast : UPDATE, JOIN, DISCONNECT
     if (strcmp(type->valuestring, "UPDATE") == 0 || strcmp(type->valuestring, "JOIN") == 0) {
         printf("[V2] Routage : Diffusion générale pour %s\n", type->valuestring);
         i1_envoyer_destination(raw_json, "255.255.255.255", PORT_RESEAU, 1);
     }
 
 
-    // 2. CAS CIBLÉ (UNICAST) : GRANT_PROP, DENY_PROP
+    // 2. Cas ciblé (UNICAST) : GRANT_PROP, DENY_PROP
     else if (strcmp(type->valuestring, "GRANT_PROP") == 0 || strcmp(type->valuestring, "DENY_PROP") == 0) {
         // Ici, en V3, on cherchera l'IP du joueur dans une table.
         // Pour l'instant, on simule l'envoi ciblé.
