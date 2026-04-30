@@ -1,0 +1,4 @@
+Unit	Base_Melee	Base_Pierce	All_Buildings	Standard_Building	Skirmishers	Cavalry_Resistance	Siege_Units	All_Archers	Shock_Infantery	Elephants	Mounted_Units	Spear_Units	High_Pierce_Armor_Siege_Units
+Knight	10	None	0	0	0	-3	0	0	None	None	None	None	None
+Pikeman	4	None	None	1	None	None	None	0	1	25	22	None	None
+Crossbowman	None	5	None	0	None	None	None	None	None	None	None	3	0
