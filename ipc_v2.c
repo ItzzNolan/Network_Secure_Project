@@ -15,7 +15,7 @@
 
 
 /**
- * ENVOI CIBLÉ (Amélioration V2)
+ * ENVOI CIBLÉ (Amélioration)
  * Permet d'envoyer soit à Python, soit en Broadcast, soit à une IP précise.
  */
 int i1_envoyer_destination(const char *data, const char *ip_dest, int port_dest, int is_broadcast) {
