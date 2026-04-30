@@ -36,19 +36,20 @@ Pour toute modification du code, on utilise...
 ```bash
 git clone https://github.com/ItzzNolan/Network_Secure_Project
 ```
-...Ou pour toute version alternative juste du main :
+...Ou pour toute version alternative juste de la version fonctionnelle pour tester :
 ```bash
-git clone --branch projet_python_main --single-branch --depth 1 https://github.com/ItzzNolan/Network_Secure_Project.git
+git clone --branch version1_bientot --single-branch --depth 1 https://github.com/ItzzNolan/Network_Secure_Project.git
 ```
 
 **2. Lancer la simulation**
 
-Au préalable, il est fortement recommandé d'installer le dernier package python pour pouvoir lancer la simulation.
+Au préalable, il est fortement recommandé d'installer le dernier package python pour pouvoir lancer la simulation et le module pygame.
 Pour lancer la simulation, on vous encourage à utiliser cette syntaxe suivante et vous situer dans le repertoire locale dans lequel vous avez fait le clonage :
+Il est fortement conseille d'utiliser des machines Linux avec l'environnement .venv pour lancer la simulation.
 
->   python3 battle.py run [type-scenario]
+>   ./lancer_joueur [id_player]
 
 Par exemple :
 ```bash
-python3 battle.py run standard
+./lancer_joueur 1
 ```
