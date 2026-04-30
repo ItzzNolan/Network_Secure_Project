@@ -15,7 +15,7 @@
 
 
 /**
- * ENVOI CIBLÉ (Amélioration)
+ * Envoi ciblé (Amélioration)
  * Permet d'envoyer soit à Python, soit en Broadcast, soit à une IP précise.
  */
 int i1_envoyer_destination(const char *data, const char *ip_dest, int port_dest, int is_broadcast) {
@@ -45,7 +45,7 @@ int i1_envoyer_destination(const char *data, const char *ip_dest, int port_dest,
 
 
 /**
- * LOGIQUE DE ROUTAGE (Le cœur de la V2)
+ * Logique de routage
  * Analyse le JSON pour décider où envoyer le message.
  */
 void i1_router_message_python(char *raw_json) {
