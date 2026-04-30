@@ -8,8 +8,8 @@
 #include "ipc_c.h"
 
 
-#define PORT_C_ENTREE 9999   // Le C écoute Python ici
-#define PORT_PY_SORTIE 9998  // Le C parle à Python ici
+#define PORT_C_ENTREE 9999   // Le C écoute Python 
+#define PORT_PY_SORTIE 9998  // Le C parle à Python 
 #define PORT_RESEAU 12345
 #define BUF_SIZE 4096
 
