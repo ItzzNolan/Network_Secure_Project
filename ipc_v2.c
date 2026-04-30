@@ -69,7 +69,7 @@ void i1_router_message_python(char *raw_json) {
 
     // 2. Cas ciblé (UNICAST) : GRANT_PROP, DENY_PROP
     else if (strcmp(type->valuestring, "GRANT_PROP") == 0 || strcmp(type->valuestring, "DENY_PROP") == 0) {
-        // Ici, en V3, on cherchera l'IP du joueur dans une table.
+        // Ici, on cherchera l'IP du joueur dans une table.
         // Pour l'instant, on simule l'envoi ciblé.
         printf("[V2] Routage : Envoi ciblé pour %s\n", type->valuestring);
         // i1_envoyer_destination(raw_json, "IP_DU_JOUEUR", PORT_RESEAU, 0);
