@@ -81,7 +81,7 @@ void i1_router_message_python(char *raw_json) {
 
 
 /**
- * TRAITEMENT DES ENTRÉES (Version non-bloquante pour select)
+ * Traitement des entrées
  */
 void i1_ecouter_canaux(int fd_python, int fd_reseau) {
     fd_set readfds;
